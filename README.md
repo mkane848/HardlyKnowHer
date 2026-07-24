@@ -73,15 +73,31 @@ Open `http://localhost:5173`.
 
 ## Card list format
 
-Plain text, one card per line. Quantities and trailing set/collector info are
-optional and get stripped automatically:
+Plain text, one card per line. Quantities and any trailing export metadata —
+set codes, collector numbers, foil/commander markers, Archidekt categories and
+colour labels — are optional and get stripped automatically, so you can paste
+an export straight from the usual deck sites without cleaning it up first:
 
 ```
-1 Sol Ring
-1x Arcane Signet
-Rampant Growth
-1 Eternal Witness (C21) 263
+Rampant Growth                                  bare name
+1 Sol Ring                                      quantity
+1x Arcane Signet                                "1x" / "1 x" also fine
+1 Eternal Witness (C21) 263                     Moxfield, Arena, MTGO
+1 Sol Ring (C21) 263 *F*                        ...with foil/commander markers
+1x Command Tower (cmr) 350 [Lands] ^Have,#7289DA^   Archidekt
+1 Lightning Bolt [SLD] 84                       TCGplayer Mass Entry
+1 Sol Ring [Commander 2021]                     spelled-out set name
 ```
+
+Blank lines, `//` and `#` comments, zone headers (`Commander`, `Sideboard`)
+and grouping headers (`Creature (12)`) are ignored. Double-faced cards keep
+their `//` separator (`Malakir Rebirth // Malakir Mire`), which is how
+Scryfall spells those names.
+
+Card names are matched exactly, case-insensitively — there's no fuzzy
+matching, so anything unrecognised comes back in the "not found" list rather
+than being guessed at. `npm test` in `server/` covers the parser against each
+of the formats above.
 
 ## Project layout
 

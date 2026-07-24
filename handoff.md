@@ -113,10 +113,18 @@ server/                Express + TS + better-sqlite3
 
 ## Core logic, summarized (read the files for full detail)
 
-- **`parseList.ts`** — regex-based parser. Handles `1 Sol Ring`,
-  `1x Sol Ring`, bare card names, and strips trailing `(SET) 123`
-  collector-number suffixes. Skips blank lines, `//`/`#` comments, and
-  section headers like `Commander:`/`Sideboard:`.
+- **`parseList.ts`** — regex-based parser. Handles bare names, `1 Sol Ring`,
+  `1x`/`1 x` quantities, and strips whatever export metadata trails the name:
+  `(SET) 263` and `[SET] 84` set codes (Moxfield/Arena/MTGO use parentheses,
+  TCGplayer Mass Entry uses square brackets), `*F*`/`*CMDR*` markers,
+  Archidekt `[Category]` tags and `^Label,#hex^` colour labels, and
+  spelled-out set names like `(Commander 2021)`. Because sites combine these
+  in different orders, the stripping runs in a loop rather than as one
+  anchored regex — that ordering assumption is what made the original version
+  miss every Archidekt and TCGplayer line. Skips blank lines, `//`/`#`
+  comments, zone headers and `Creature (12)` grouping headers.
+  `npm test` (`scripts/test-parse-list.ts`, node:assert via tsx, no test
+  framework) covers each format; run it if you touch this file.
 
 - **`synergy.ts`** — the heart of the app.
   1. Builds a `CollectionProfile` from the matched cards: color-identity
@@ -175,6 +183,14 @@ server/                Express + TS + better-sqlite3
 - **Card name matching is exact (case-insensitive) only** — no fuzzy
   matching. Real decklists will likely have some near-misses; worth seeing
   how bad this is in practice before deciding whether it needs fixing.
+- **Double-faced cards only match by their full name.** The import stores
+  Scryfall's `name`, which for a DFC is `Malakir Rebirth // Malakir Mire`.
+  Sites that export both faces match fine, but any site exporting only the
+  front face (`Malakir Rebirth`) will miss. This is a matching question
+  rather than a parsing one — the fix would be indexing front-face names as
+  an alternate key in `import-scryfall.ts`/`db.ts`, not more regex work in
+  `parseList.ts`. Not done, since it's adjacent to the "no fuzzy matching"
+  non-goal and worth deciding on deliberately.
 - **The compiled build must keep `src/` as its root.** `db.ts` finds the
   card database with `path.join(__dirname, '..', 'data')`, which only
   lands on `server/data` if the compiled `db.js` sits one level under
