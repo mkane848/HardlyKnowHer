@@ -368,6 +368,143 @@ body {
   border-top: 1px solid var(--parchment-dim);
 }
 
+/* "Why this commander?" disclosure */
+
+.explain-toggle {
+  margin-top: 0.6rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #7a5615;
+  background: rgba(184, 132, 42, 0.12);
+  border: 1px solid rgba(184, 132, 42, 0.35);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.explain-toggle:hover {
+  background: rgba(184, 132, 42, 0.22);
+}
+
+.explain-chevron {
+  font-size: 0.6rem;
+}
+
+.explain-panel {
+  margin-top: 0.75rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--parchment-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.explain-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.explain-heading {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brass);
+  margin: 0;
+}
+
+.explain-oracle {
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--ink-text-muted);
+  margin: 0;
+  white-space: pre-line;
+}
+
+.explain-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.explain-group-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.explain-count {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--ink-text-muted);
+}
+
+.explain-group-desc {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--ink-text-muted);
+  margin: 0;
+}
+
+.support-cards {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.support-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(36, 31, 22, 0.07);
+  border: 1px solid var(--parchment-dim);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.support-qty {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-text-muted);
+}
+
+.support-gc {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--pip-r);
+  background: rgba(198, 54, 42, 0.13);
+  border-radius: 4px;
+  padding: 0.05rem 0.25rem;
+}
+
+.explain-caveat {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ink-text-muted);
+  margin: 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--parchment-dim);
+}
+
 .app-footer {
   margin-top: 3rem;
   padding-top: 1.5rem;

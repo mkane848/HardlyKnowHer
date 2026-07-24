@@ -49,14 +49,9 @@ router.post('/recommend', (req, res) => {
   const scored = scoreCommanders(candidates, profile, owned).slice(0, 10);
 
   const suggestions = scored.map((s) => {
-    const identitySet = new Set(parseJsonArray(s.card.color_identity));
-    let gameChangerCount = s.card.game_changer ? 1 : 0;
-
-    for (const { row } of owned) {
-      const cardIdentity = parseJsonArray(row.color_identity);
-      const fitsIdentity = cardIdentity.every((c) => identitySet.has(c));
-      if (fitsIdentity && row.game_changer) gameChangerCount++;
-    }
+    // The commander itself counts toward the Bracket alongside any Game
+    // Changers in the list that fit its colour identity.
+    const gameChangerCount = (s.card.game_changer ? 1 : 0) + s.gameChangerCards.length;
 
     return {
       oracleId: s.card.oracle_id,
@@ -64,10 +59,14 @@ router.post('/recommend', (req, res) => {
       imageUri: s.card.image_uri,
       colorIdentity: parseJsonArray(s.card.color_identity),
       typeLine: s.card.type_line,
+      oracleText: s.card.oracle_text,
       score: Math.round(s.score),
       matchedThemes: s.matchedThemes,
       matchedCreatureTypes: s.matchedCreatureTypes,
       includedCardCount: s.includedCardCount,
+      themeSupport: s.themeSupport,
+      tribeSupport: s.tribeSupport,
+      gameChangerCards: s.gameChangerCards,
       gameChangerCount,
       isGameChanger: !!s.card.game_changer,
       bracket: estimateBracket(gameChangerCount),
