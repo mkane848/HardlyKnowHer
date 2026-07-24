@@ -1,24 +1,26 @@
 import { create } from 'zustand';
-import type { RecommendResponse } from '../types';
 
+/**
+ * Client state only.
+ *
+ * Anything fetched from the server — recommendations, combos — lives in
+ * TanStack Query instead (see api/queries.ts), which owns caching and
+ * loading/error state for it. This store is for things the user is
+ * manipulating directly, which is where an account's session and preferences
+ * would go later.
+ */
 interface AppState {
+  /** Live textarea contents. */
   rawList: string;
-  isLoading: boolean;
-  error: string | null;
-  result: RecommendResponse | null;
+  /** The list actually submitted — the key everything server-side hangs off. */
+  submittedList: string;
   setRawList: (text: string) => void;
-  setResult: (result: RecommendResponse) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
+  submitList: (text: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
   rawList: '',
-  isLoading: false,
-  error: null,
-  result: null,
+  submittedList: '',
   setRawList: (rawList) => set({ rawList }),
-  setResult: (result) => set({ result, error: null }),
-  setLoading: (isLoading) => set({ isLoading }),
-  setError: (error) => set({ error, isLoading: false }),
+  submitList: (submittedList) => set({ submittedList }),
 }));

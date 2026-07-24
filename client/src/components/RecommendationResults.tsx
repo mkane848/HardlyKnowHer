@@ -1,12 +1,13 @@
 import { useAppStore } from '../store/useAppStore';
+import { useRecommendations } from '../api/queries';
 import { CommanderCard } from './CommanderCard';
 
 export function RecommendationResults() {
-  const result = useAppStore((s) => s.result);
-  const error = useAppStore((s) => s.error);
+  const submittedList = useAppStore((s) => s.submittedList);
+  const { data: result, error } = useRecommendations(submittedList);
 
   if (error) {
-    return <p className="status-error">{error}</p>;
+    return <p className="status-error">{error instanceof Error ? error.message : 'Something went wrong.'}</p>;
   }
 
   if (!result) {

@@ -12,9 +12,7 @@
  */
 import assert from 'node:assert';
 import http from 'node:http';
-import { findCombos, clearComboCache, SpellbookError } from '../src/services/spellbook';
-
-const PORT = 8911;
+import type { AddressInfo } from 'node:net';
 
 interface MockState {
   requests: { body: unknown; userAgent?: string }[];
@@ -54,7 +52,14 @@ function check(label: string, fn: () => void | Promise<void>): Promise<void> {
 }
 
 async function main() {
-  await new Promise<void>((resolve) => server.listen(PORT, '127.0.0.1', resolve));
+  // Port 0 lets the OS pick a free one, so this can't collide with whatever
+  // else happens to be listening. The endpoint has to be set before the
+  // module is imported, hence the dynamic import below.
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  process.env.SPELLBOOK_ENDPOINT = `http://127.0.0.1:${port}/find-my-combos`;
+
+  const { findCombos, clearComboCache, SpellbookError } = await import('../src/services/spellbook');
 
   await check('normalises nested {card:{name}} / {feature:{name}} shapes', async () => {
     clearComboCache();

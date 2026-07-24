@@ -49,7 +49,22 @@ That's a much weaker guarantee than actually running it.
 All explicitly requested by the user unless noted:
 
 - **Vite + React + TypeScript** (client)
-- **Zustand** for state — one store, `client/src/store/useAppStore.ts`
+- **Zustand + TanStack Query** for state, split by what the state *is*:
+  Zustand (`client/src/store/useAppStore.ts`) holds client state only — the
+  textarea contents and the list that was actually submitted — and is where a
+  user session would go once there are accounts. Everything fetched lives in
+  Query (`client/src/api/queries.ts`), which owns its caching and
+  loading/error state. Recommendations are modelled as a *query* keyed on the
+  submitted list, not a mutation: the POST is only because a deck list is too
+  big for a query string, and nothing changes server-side. That keying is why
+  the form and the results section can read the same data without passing
+  anything between them.
+  **The defaults in `main.tsx` are load-bearing.** Query retries failed
+  queries three times and refetches on window focus out of the box; against
+  Commander Spellbook that would mean more traffic than the hand-rolled
+  version sent. `retry`, `refetchOnWindowFocus` and `refetchOnReconnect` are
+  all off deliberately — don't restore them without thinking about who is
+  being called.
 - **Express + TypeScript + better-sqlite3** (server) — user chose this over
   a fully client-side/WASM-SQLite approach when offered the choice, wanting
   a more conventional setup with easier persistence.

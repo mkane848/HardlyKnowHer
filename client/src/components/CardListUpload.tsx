@@ -1,16 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { fetchRecommendations } from '../api/client';
+import { useRecommendations } from '../api/queries';
 
 export function CardListUpload() {
   const rawList = useAppStore((s) => s.rawList);
-  const isLoading = useAppStore((s) => s.isLoading);
+  const submittedList = useAppStore((s) => s.submittedList);
   const setRawList = useAppStore((s) => s.setRawList);
-  const setResult = useAppStore((s) => s.setResult);
-  const setLoading = useAppStore((s) => s.setLoading);
-  const setError = useAppStore((s) => s.setError);
+  const submitList = useAppStore((s) => s.submitList);
 
   const [fileName, setFileName] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Same cache entry the results section reads — no state passed between them.
+  const { isFetching } = useRecommendations(submittedList);
 
   async function handleFile(file: File) {
     const text = await file.text();
@@ -18,21 +20,14 @@ export function CardListUpload() {
     setFileName(file.name);
   }
 
-  async function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!rawList.trim()) {
-      setError('Paste or upload a card list first.');
+      setValidationError('Paste or upload a card list first.');
       return;
     }
-    setLoading(true);
-    try {
-      const result = await fetchRecommendations(rawList);
-      setResult(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setLoading(false);
-    }
+    setValidationError(null);
+    submitList(rawList);
   }
 
   return (
@@ -49,6 +44,7 @@ export function CardListUpload() {
         rows={12}
         spellCheck={false}
       />
+      {validationError && <p className="status-error">{validationError}</p>}
       <div className="upload-actions">
         <label className="file-button">
           Upload .txt
@@ -63,8 +59,8 @@ export function CardListUpload() {
           />
         </label>
         {fileName && <span className="file-name">{fileName}</span>}
-        <button type="submit" className="primary-button" disabled={isLoading}>
-          {isLoading ? 'Finding synergies…' : 'Suggest Commanders'}
+        <button type="submit" className="primary-button" disabled={isFetching}>
+          {isFetching ? 'Finding synergies…' : 'Suggest Commanders'}
         </button>
       </div>
     </form>

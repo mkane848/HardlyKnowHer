@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { fetchCombos } from '../api/client';
 import { useAppStore } from '../store/useAppStore';
-import type { ComboDTO, ComboLookupResponse } from '../types';
+import { useCombos } from '../api/queries';
+import type { ComboDTO } from '../types';
 
 function ComboList({ combos, showMissing }: { combos: ComboDTO[]; showMissing?: boolean }) {
   return (
@@ -36,80 +36,74 @@ function ComboList({ combos, showMissing }: { combos: ComboDTO[]; showMissing?: 
  * Explicit, click-to-run combo lookup. Nothing is requested from Commander
  * Spellbook until the user asks for it, so browsing suggestions never
  * generates traffic against their API.
+ *
+ * The lookup is keyed on the submitted list rather than the textarea's
+ * current contents, so editing the box after getting results doesn't quietly
+ * ask about a different deck than the one on screen.
  */
 export function ComboFinder({ commanderName }: { commanderName: string }) {
-  const rawList = useAppStore((state) => state.rawList);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [result, setResult] = useState<ComboLookupResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const submittedList = useAppStore((s) => s.submittedList);
+  const [requested, setRequested] = useState(false);
+  const { data, error, isFetching, refetch } = useCombos(commanderName, submittedList, requested);
 
-  async function search() {
-    setStatus('loading');
-    setError(null);
-    try {
-      setResult(await fetchCombos(rawList, commanderName));
-      setStatus('done');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Combo lookup failed.');
-      setStatus('error');
-    }
-  }
-
-  const nothingFound = result && result.ready.length === 0 && result.almost.length === 0;
+  // `data` is served from cache even while disabled, so collapsing this panel
+  // and reopening it shows the previous answer instead of asking again.
+  const showIdle = !data && !isFetching && !error;
+  const nothingFound = data && data.ready.length === 0 && data.almost.length === 0;
 
   return (
     <section className="explain-section">
       <h4 className="explain-heading">Combos</h4>
 
-      {status === 'idle' && (
+      {showIdle && (
         <>
           <p className="explain-group-desc">
             Check Commander Spellbook for combos between this commander and the cards in your list that
             fit its colour identity.
           </p>
-          <button type="button" className="combo-button" onClick={search}>
+          <button type="button" className="combo-button" onClick={() => setRequested(true)}>
             Find combos
           </button>
         </>
       )}
 
-      {status === 'loading' && <p className="explain-group-desc">Asking Commander Spellbook…</p>}
+      {isFetching && <p className="explain-group-desc">Asking Commander Spellbook…</p>}
 
-      {status === 'error' && (
+      {error && !isFetching && (
         <>
-          <p className="combo-error">{error}</p>
-          <button type="button" className="combo-button" onClick={search}>
+          <p className="combo-error">{error instanceof Error ? error.message : 'Combo lookup failed.'}</p>
+          <button type="button" className="combo-button" onClick={() => refetch()}>
             Try again
           </button>
         </>
       )}
 
-      {status === 'done' && result && (
+      {data && !isFetching && (
         <>
           <p className="explain-group-desc">
-            Searched {result.searchedCardCount} card{result.searchedCardCount === 1 ? '' : 's'} from your
-            list{result.cached ? ' (cached)' : ''}.
+            Searched {data.searchedCardCount} card{data.searchedCardCount === 1 ? '' : 's'} from your list
+            {data.cached ? ' (cached)' : ''}.
           </p>
 
           {nothingFound && <p className="explain-group-desc">No combos found with these cards.</p>}
 
-          {result.ready.length > 0 && (
+          {data.ready.length > 0 && (
             <div className="explain-group">
               <p className="explain-group-title">
-                Ready to go <span className="explain-count">{result.ready.length}</span>
+                Ready to go <span className="explain-count">{data.ready.length}</span>
               </p>
               <p className="explain-group-desc">Every piece is already in your list.</p>
-              <ComboList combos={result.ready} />
+              <ComboList combos={data.ready} />
             </div>
           )}
 
-          {result.almost.length > 0 && (
+          {data.almost.length > 0 && (
             <div className="explain-group">
               <p className="explain-group-title">
-                Almost there <span className="explain-count">{result.almost.length}</span>
+                Almost there <span className="explain-count">{data.almost.length}</span>
               </p>
               <p className="explain-group-desc">A card or two short.</p>
-              <ComboList combos={result.almost} showMissing />
+              <ComboList combos={data.almost} showMissing />
             </div>
           )}
 
