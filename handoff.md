@@ -175,6 +175,19 @@ server/                Express + TS + better-sqlite3
 - **Card name matching is exact (case-insensitive) only** — no fuzzy
   matching. Real decklists will likely have some near-misses; worth seeing
   how bad this is in practice before deciding whether it needs fixing.
+- **The compiled build must keep `src/` as its root.** `db.ts` finds the
+  card database with `path.join(__dirname, '..', 'data')`, which only
+  lands on `server/data` if the compiled `db.js` sits one level under
+  `server/` (i.e. `dist/db.js`). This is why the build runs against
+  `tsconfig.build.json` (`rootDir: "src"`, `src/` only) rather than the
+  root `tsconfig.json`, which type-checks `scripts/` too and would root
+  the output a level higher (`dist/src/db.js`). That nesting broke the
+  first working deploy in a nasty way: the server started fine and
+  `/api/health` passed, but `db.ts` created an empty database at
+  `dist/data/` that nothing ever seeds, so every recommendation returned
+  the "database is empty" 503. If you change the build layout, start the
+  compiled server and actually POST a list — a passing health check
+  proves nothing here.
 
 ## Deployment
 
