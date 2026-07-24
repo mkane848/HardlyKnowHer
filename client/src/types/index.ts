@@ -43,6 +43,23 @@ export interface CommanderSuggestionDTO {
   bracket: BracketEstimateDTO;
 }
 
+export interface ComboDTO {
+  id: string | null;
+  permalink: string | null;
+  cards: string[];
+  produces: string[];
+  description: string | null;
+  /** Pieces you don't have. Empty for combos you can already assemble. */
+  missing: string[];
+}
+
+export interface ComboLookupResponse {
+  ready: ComboDTO[];
+  almost: ComboDTO[];
+  cached: boolean;
+  searchedCardCount: number;
+}
+
 export interface RecommendResponse {
   totalParsed: number;
   totalMatched: number;

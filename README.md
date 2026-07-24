@@ -99,6 +99,24 @@ matching, so anything unrecognised comes back in the "not found" list rather
 than being guessed at. `npm test` in `server/` covers the parser against each
 of the formats above.
 
+## Why a commander was suggested
+
+Each suggestion has a **"Why this commander?"** disclosure. Expanding it shows
+the commander's rules text, every creature type and theme it shares with your
+list, the specific cards behind each of those signals, and which cards drive
+the Bracket estimate. Only cards that fit the commander's colour identity are
+cited, since anything else couldn't go in the deck.
+
+Inside that panel, **"Find combos"** asks
+[Commander Spellbook](https://commanderspellbook.com/) which combos the
+commander makes with your cards, and shows both the ones you can already
+assemble and the ones you're a card or two short of.
+
+That lookup only ever runs when you click it — browsing suggestions sends
+nothing to Commander Spellbook. Results are cached server-side for an hour, and
+if their API asks us to back off we say so rather than retrying. Combo data is
+theirs; the app just asks and displays.
+
 ## Project layout
 
 ```

@@ -126,6 +126,22 @@ server/                Express + TS + better-sqlite3
   `npm test` (`scripts/test-parse-list.ts`, node:assert via tsx, no test
   framework) covers each format; run it if you touch this file.
 
+- **`spellbook.ts` + `routes/combos.ts`** — Commander Spellbook lookup, used
+  by the "Find combos" button inside a suggestion's expanded details. It runs
+  **only on an explicit click** — never on page load, on a timer, or as part
+  of a recommendation — and hits `find-my-combos`, the endpoint they built for
+  this exact question, rather than crawling their whole database. Answers are
+  cached in memory for an hour, keyed on commander + card set, so repeat
+  clicks cost them nothing; a 429 is surfaced with their `Retry-After` and
+  **not** retried. Keep those properties if you touch this: the polite
+  behaviour is the reason it's acceptable to call them at all.
+  **The live request/response contract is unverified.** Their API shape isn't
+  in any public doc I could reach, so the adapter normalises defensively
+  (`{card:{name}}`, `{card}` and plain strings all work) and
+  `scripts/test-spellbook.ts` pins the behaviour against a local mock built
+  from a best reading of their API. If real responses come back empty, the
+  field mapping in `normalizeVariant` is the first thing to check.
+
 - **`synergy.ts`** — the heart of the app.
   1. Builds a `CollectionProfile` from the matched cards: color-identity
      counts, creature-type counts, and counts against ~12 hand-picked

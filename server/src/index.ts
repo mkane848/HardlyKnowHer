@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import recommendRouter from './routes/recommend';
+import combosRouter from './routes/combos';
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json({ limit: '2mb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api', recommendRouter);
+app.use('/api', combosRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 app.listen(PORT, () => {

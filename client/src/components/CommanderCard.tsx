@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { ComboFinder } from './ComboFinder';
 import type { CommanderSuggestionDTO, SupportingCardDTO } from '../types';
 
 const COLOR_LABELS: Record<string, string> = {
@@ -151,6 +152,8 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
                 <SupportingCardList cards={suggestion.gameChangerCards} />
               </section>
             )}
+
+            <ComboFinder commanderName={suggestion.name} />
 
             <p className="explain-caveat">
               Matches come from card text and creature types, not a model of how the deck actually plays.
