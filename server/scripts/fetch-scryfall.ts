@@ -20,13 +20,36 @@ interface BulkDataEntry {
   size: number;
 }
 
+/**
+ * Builds the "what went wrong" half of a failure message.
+ *
+ * Scryfall explains rejections in the response body — a JSON error object
+ * whose `details` field says exactly what it objected to — while the status
+ * code alone rarely narrows it down. These requests only ever run
+ * unattended in a build log, so there's no chance to re-run them by hand
+ * with more logging; whatever we print here is all you get.
+ */
+async function describeFailure(res: Response): Promise<string> {
+  let body = '';
+  try {
+    body = (await res.text()).trim();
+  } catch {
+    // An unreadable body shouldn't swallow the status code.
+  }
+
+  if (!body) return `HTTP ${res.status}`;
+  // Bounded in case a proxy or error page answers with a wall of HTML.
+  const snippet = body.length > 500 ? `${body.slice(0, 500)}…` : body;
+  return `HTTP ${res.status}: ${snippet}`;
+}
+
 async function main() {
   console.log('Looking up the latest Scryfall bulk data URL...');
   const listRes = await fetch('https://api.scryfall.com/bulk-data', {
     headers: SCRYFALL_HEADERS,
   });
   if (!listRes.ok) {
-    throw new Error(`Failed to list Scryfall bulk data (HTTP ${listRes.status})`);
+    throw new Error(`Failed to list Scryfall bulk data (${await describeFailure(listRes)})`);
   }
   const { data } = (await listRes.json()) as { data: BulkDataEntry[] };
   const oracleCards = data.find((entry) => entry.type === 'oracle_cards');
@@ -41,7 +64,7 @@ async function main() {
     headers: SCRYFALL_HEADERS,
   });
   if (!fileRes.ok) {
-    throw new Error(`Failed to download bulk file (HTTP ${fileRes.status})`);
+    throw new Error(`Failed to download bulk file (${await describeFailure(fileRes)})`);
   }
 
   if (!fs.existsSync(DATA_DIR)) {
