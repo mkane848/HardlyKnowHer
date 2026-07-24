@@ -145,10 +145,17 @@ server/                Express + TS + better-sqlite3
 
 ## Known risk areas / things to verify
 
-- **`better-sqlite3` is a native module.** `npm install` should fetch a
-  prebuilt binary for most common platforms; if it tries to compile from
-  source, it needs a C++ toolchain. Worth confirming this installs cleanly
-  wherever this next runs.
+- **`better-sqlite3` is a native module.** This bit us on the real Render
+  deploy: v11 (the original pin) has no prebuilt binary for newer Node
+  versions and falls back to compiling from source, which fails outright
+  on Node 26 because its addon code calls a V8 API
+  (`PropertyCallbackInfo::This()`) that Node 26's V8 removed. Fixed by
+  upgrading to v13, which is built on `node-addon-api` (N-API) instead of
+  raw V8 bindings — N-API is ABI-stable across Node versions, so it
+  doesn't break on newer Node the way v11 did. `server/package.json`'s
+  `engines.node` is now `>=22` to match v13's own requirement. If this
+  breaks again on some future Node version, check whether it's the same
+  class of issue before assuming it's something else.
 - **Scryfall's API/bulk-data shape.** `fetch-scryfall.ts` and
   `import-scryfall.ts` assume a specific JSON shape (`data[].type ===
   'oracle_cards'`, `card.legalities.commander`, `card.game_changer`,

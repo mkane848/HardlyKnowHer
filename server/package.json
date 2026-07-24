@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "engines": {
-    "node": ">=18.18"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -15,7 +15,7 @@
     "prepare-data": "npm run fetch-scryfall && npm run import-scryfall"
   },
   "dependencies": {
-    "better-sqlite3": "^11.3.0",
+    "better-sqlite3": "^13.0.1",
     "cors": "^2.8.5",
     "express": "^4.21.0"
   },
