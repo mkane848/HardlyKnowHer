@@ -162,6 +162,12 @@ server/                Express + TS + better-sqlite3
   `card.color_identity`, etc.) based on Scryfall's documented API as of
   this project's creation. Worth a quick sanity check against a live
   response if anything about the import looks off.
+- **Scryfall requires `User-Agent` and `Accept` headers** on every request
+  and answers HTTP 400 without them — this broke the first real deploy.
+  The User-Agent has to name this app specifically; Scryfall flags the
+  defaults HTTP libraries send (Node's built-in `fetch` included) as junk
+  traffic. `fetch-scryfall.ts` sets both. Don't drop them, and if you add
+  new Scryfall calls anywhere, send them there too.
 - **`render.yaml`'s `fromService`/`property: host` syntax** for wiring the
   client's `VITE_API_URL` to the server's URL was written from Render's
   current Blueprint docs but has never actually been deployed. If the
