@@ -17,11 +17,12 @@ services:
         value: production
 
   # Static Vite build. VITE_API_URL is wired to the server service's
-  # hostname automatically so you don't have to hardcode it.
+  # hostname automatically so you don't have to hardcode it. Static sites
+  # have no "plan" field — they're served free via CDN, not run on a
+  # compute instance like the server above.
   - type: web
     runtime: static
     name: mtg-recommender-client
-    plan: free
     rootDir: client
     buildCommand: npm install && VITE_API_URL="https://${SERVER_HOST}.onrender.com" npm run build
     staticPublishPath: dist

@@ -27,10 +27,12 @@ the server's URL automatically.
 
 ## Good to know
 
-- **Cold starts:** Render's free web services spin down after 15 minutes of
-  inactivity. The first request after a lull takes 30–60 seconds while it
-  wakes back up. Fine for a personal project; upgrade to a paid instance
-  type later if that ever bothers you.
+- **Cold starts:** the server (`mtg-recommender-server`) is a free compute
+  instance and spins down after 15 minutes of inactivity — the first request
+  after a lull takes 30–60 seconds while it wakes back up. The client is a
+  static site served from Render's CDN, so it has no compute instance and
+  no cold start. Fine for a personal project; upgrade the server to a paid
+  instance type later if the wake-up delay ever bothers you.
 - **Data freshness:** the card database is rebuilt from scratch on every
   deploy (see `README.md` for why this is fine — it's read-only reference
   data, not something that needs to persist). Redeploy manually from the
