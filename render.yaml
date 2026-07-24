@@ -10,7 +10,10 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    buildCommand: npm install && npm run prepare-data && npm run build
+    # --include=dev is required here: NODE_ENV=production (set below) makes
+    # plain `npm install` skip devDependencies, but prepare-data/build need
+    # tsx and tsc, which are devDependencies.
+    buildCommand: npm install --include=dev && npm run prepare-data && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
