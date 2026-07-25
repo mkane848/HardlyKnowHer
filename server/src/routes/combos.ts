@@ -27,7 +27,9 @@ router.post('/combos', async (req, res) => {
     return res.status(503).json({ error: 'The card database is empty — run "npm run prepare-data" first.' });
   }
 
-  const { list, commanderName } = req.body as { list?: unknown; commanderName?: unknown };
+  // See the note in recommend.ts: Express 5 leaves req.body undefined when
+  // there is no parseable body, so guard before destructuring.
+  const { list, commanderName } = (req.body ?? {}) as { list?: unknown; commanderName?: unknown };
   if (typeof list !== 'string' || !list.trim()) {
     return res.status(400).json({ error: 'Request body must include a non-empty "list" string.' });
   }

@@ -9,6 +9,6 @@
     "import-scryfall": "npm run import-scryfall --prefix server"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1"
+    "concurrently": "^10.0.4"
   }
 }

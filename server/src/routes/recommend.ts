@@ -30,7 +30,10 @@ router.post('/recommend', (req, res) => {
     });
   }
 
-  const { list } = req.body as { list?: unknown };
+  // req.body is undefined — not {} — when no body was parsed at all, e.g. a
+  // POST with no Content-Type. Express 4 always left an object here; 5 does
+  // not, and destructuring it directly throws a 500 instead of answering 400.
+  const { list } = (req.body ?? {}) as { list?: unknown };
   if (typeof list !== 'string' || !list.trim()) {
     return res.status(400).json({ error: 'Request body must include a non-empty "list" string.' });
   }
