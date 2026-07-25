@@ -70,6 +70,7 @@ router.post('/recommend', (req, res) => {
       typeLine: s.card.type_line,
       oracleText: s.card.oracle_text,
       manaCost: s.card.mana_cost,
+      manaValue: s.card.cmc,
       power: s.card.power,
       toughness: s.card.toughness,
       scryfallUri: s.card.scryfall_uri,

@@ -9,18 +9,30 @@ function ComboList({ combos, showMissing }: { combos: ComboDTO[]; showMissing?: 
       {combos.map((combo, index) => (
         <li key={combo.id ?? index} className="combo-item">
           <p className="combo-cards">{combo.cards.join(' + ')}</p>
+
           {combo.produces.length > 0 && (
             <p className="combo-produces">
               <span className="combo-arrow" aria-hidden="true">
                 →
-              </span>{' '}
-              {combo.produces.join(', ')}
+              </span>
+              <span className="combo-produces-list">{combo.produces.join(', ')}</span>
             </p>
           )}
+
           {showMissing && combo.missing.length > 0 && (
             <p className="combo-missing">Missing: {combo.missing.join(', ')}</p>
           )}
-          {combo.description && <p className="combo-steps">{combo.description}</p>}
+
+          {/* Steps can run to a full paragraph of rules text — collapsed by
+              default so a handful of combos doesn't turn into a wall of text
+              to scroll past just to compare which ones are worth chasing. */}
+          {combo.description && (
+            <details className="combo-steps-details">
+              <summary>Steps</summary>
+              <p className="combo-steps">{combo.description}</p>
+            </details>
+          )}
+
           {combo.permalink && (
             <a className="combo-link" href={combo.permalink} target="_blank" rel="noreferrer noopener">
               View on Commander Spellbook
