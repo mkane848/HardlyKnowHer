@@ -42,24 +42,29 @@ root itself: `npm install`.)
 
 ### 2. Get the Scryfall card data
 
-The app needs a local copy of Scryfall's **Oracle Cards** bulk file. This
-project doesn't download it automatically — grab it yourself:
-
-1. Go to <https://scryfall.com/docs/api/bulk-data>
-2. Download the **Oracle Cards** JSON file (~100–150MB — it's one entry per
-   unique card, which is what you want here, not "All Cards")
-3. Save it as `server/data/oracle-cards.json`
-
-Then seed the database:
-
 ```bash
-npm run import-scryfall
+cd server && npm run prepare-data
 ```
 
-This creates `server/data/cards.sqlite`. Re-run this whenever you download a
-fresh bulk file (Scryfall regenerates it roughly every 12–24 hours, but the
-ban list / Game Changers list only change a handful of times a year, so
-there's no need to do this often — monthly is plenty).
+This downloads Scryfall's **Oracle Cards** bulk file (~170MB, one entry per
+unique card) to `server/data/oracle-cards.json` and seeds
+`server/data/cards.sqlite` from it. Takes a few minutes on a home connection.
+
+**It won't re-download if you already have a copy less than a week old** — it
+reuses what's on disk and tells you how old it is, so iterating locally
+doesn't mean pulling 170MB every time. To force a fresh pull:
+
+```bash
+npm run prepare-data:fresh
+```
+
+You rarely need to. Scryfall regenerates the file every 12–24 hours, but the
+things this app reads from it — the ban list and the Game Changers list —
+change only a handful of times a year. Monthly is plenty.
+
+The freshness check only applies locally. A deploy always starts from a clean
+checkout with no data directory, so it downloads every time and a deployed
+copy is never stale.
 
 ### 3. Run the app
 
@@ -130,6 +135,7 @@ server/
       synergy.ts        Collection profiling + commander scoring
       bracket.ts         Bracket estimate heuristic
   scripts/
+    fetch-scryfall.ts   Downloads the Oracle Cards bulk file (skips if recent)
     import-scryfall.ts  Seeds cards.sqlite from the downloaded bulk file
   data/                 (gitignored) oracle-cards.json + cards.sqlite live here
 ```

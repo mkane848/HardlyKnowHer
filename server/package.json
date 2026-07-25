@@ -14,7 +14,8 @@
     "start": "node dist/index.js",
     "fetch-scryfall": "tsx scripts/fetch-scryfall.ts",
     "import-scryfall": "tsx scripts/import-scryfall.ts",
-    "prepare-data": "npm run fetch-scryfall && npm run import-scryfall"
+    "prepare-data": "npm run fetch-scryfall && npm run import-scryfall",
+    "prepare-data:fresh": "tsx scripts/fetch-scryfall.ts --force && npm run import-scryfall"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.1",
