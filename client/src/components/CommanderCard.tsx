@@ -1,14 +1,27 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ComboFinder } from './ComboFinder';
 import { CardDetailDialog } from './CardDetailDialog';
+import { CardImageDialog } from './CardImageDialog';
 import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
 import { visibleThemeSupport, visibleTribeSupport } from '../lib/suggestions';
 import { ManaSymbol } from './ManaSymbol';
-import type { CommanderSuggestionDTO, SupportingCardDTO } from '../types';
+import type { CommanderSuggestionDTO, PartnerOptionDTO, SupportingCardDTO } from '../types';
 
 function cardCount(cards: SupportingCardDTO[]): number {
   return cards.reduce((sum, card) => sum + card.quantity, 0);
+}
+
+/** Pips for a colour identity, falling back to the colorless pip. */
+function IdentityPips({ colors }: { colors: string[] }) {
+  if (colors.length === 0) return <ManaSymbol color="C" decorative />;
+  return (
+    <>
+      {sortWubrg(colors).map((color) => (
+        <ManaSymbol key={color} color={color} decorative />
+      ))}
+    </>
+  );
 }
 
 function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
@@ -17,7 +30,14 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
       {cards.map((card) => (
         <li key={card.name} className="support-card">
           {card.quantity > 1 && <span className="support-qty">{card.quantity}×</span>}
-          <span className="support-name">{card.name}</span>
+          {/* The name opens the card itself — the list is where you're
+              checking "which cards did it actually mean?", and a name alone
+              often isn't enough to remember what one does. */}
+          <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
+            <button type="button" className="support-name" aria-label={`Show the card ${card.name}`}>
+              {card.name}
+            </button>
+          </CardImageDialog>
           {card.isGameChanger && (
             <span className="support-gc" title="On the Game Changers list">
               GC
@@ -29,9 +49,46 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
   );
 }
 
+/**
+ * Second commanders this one could share the command zone with.
+ *
+ * Ranked by how much of the list each pairing unlocks, because that is the
+ * practical reason to care: a second commander widens the deck's colour
+ * identity, and the useful question is which pairing lets you play more of
+ * what you already own.
+ */
+function PartnerOptions({ options }: { options: PartnerOptionDTO[] }) {
+  return (
+    <ul className="partner-list">
+      {options.map((option) => (
+        <li key={option.oracleId} className="partner-item">
+          <CardImageDialog
+            name={option.name}
+            imageUri={option.imageUri}
+            scryfallUri={option.scryfallUri}
+          >
+            <button type="button" className="partner-name" aria-label={`Show the card ${option.name}`}>
+              {option.name}
+            </button>
+          </CardImageDialog>
+
+          <span className="partner-meta">
+            <span className="partner-pips">
+              <IdentityPips colors={option.combinedIdentity} />
+            </span>
+            <span className="partner-identity">{identityName(option.combinedIdentity)}</span>
+            {option.addedCardCount > 0 && (
+              <span className="partner-gain">+{option.addedCardCount} cards</span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
   const [expanded, setExpanded] = useState(false);
-  const [showFullArt, setShowFullArt] = useState(false);
   const detailsId = useId();
   const dismiss = useAppStore((s) => s.dismiss);
 
@@ -64,25 +121,29 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
     return () => observer.disconnect();
   }, [suggestion.oracleText]);
 
-  const hasReasons = themeSupport.length > 0 || tribeSupport.length > 0 || suggestion.gameChangerCards.length > 0;
+  const partnerOptions = suggestion.partnerOptions ?? [];
+  const hasReasons =
+    themeSupport.length > 0 ||
+    tribeSupport.length > 0 ||
+    suggestion.gameChangerCards.length > 0 ||
+    partnerOptions.length > 0;
 
   return (
     <article className={`commander-card${expanded ? ' is-expanded' : ''}`}>
       {suggestion.imageUri && (
-        <div className={`commander-art${showFullArt ? ' is-showing-full-art' : ''}`}>
+        <CardImageDialog
+          name={suggestion.name}
+          imageUri={suggestion.imageUri}
+          scryfallUri={suggestion.scryfallUri}
+        >
           <button
             type="button"
             className="commander-art-trigger"
-            onClick={() => setShowFullArt((open) => !open)}
-            aria-label={
-              showFullArt ? `Hide full art for ${suggestion.name}` : `Show full art for ${suggestion.name}`
-            }
-            aria-pressed={showFullArt}
+            aria-label={`Show the full card for ${suggestion.name}`}
           >
             <img className="commander-image" src={suggestion.imageUri} alt={suggestion.name} loading="lazy" />
           </button>
-          <img className="commander-art-preview" src={suggestion.imageUri} alt="" aria-hidden loading="lazy" />
-        </div>
+        </CardImageDialog>
       )}
       <button
         type="button"
@@ -129,6 +190,21 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
         <div className="badge-row">
           <span className="badge badge-bracket">{suggestion.bracket.range}</span>
           {suggestion.isGameChanger && <span className="badge badge-gc">Game Changer</span>}
+          {suggestion.pairing && (
+            <span
+              className="badge badge-pairing"
+              title={
+                suggestion.pairing.label
+                  ? `${suggestion.pairing.mechanicName} ${suggestion.pairing.label}`
+                  : `${suggestion.pairing.mechanicName} — can share the command zone`
+              }
+            >
+              {suggestion.pairing.mechanicName}
+              {suggestion.pairing.kind === 'partner-with' && suggestion.pairing.label
+                ? ` ${suggestion.pairing.label}`
+                : ''}
+            </span>
+          )}
         </div>
 
         <p className="commander-meta">
@@ -196,6 +272,17 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
                     <SupportingCardList cards={theme.cards} />
                   </div>
                 ))}
+              </section>
+            )}
+
+            {partnerOptions.length > 0 && suggestion.pairing && (
+              <section className="explain-section">
+                <h4 className="explain-heading">Second commander</h4>
+                <p className="explain-group-desc">
+                  {suggestion.pairing.mechanicName} lets this share the command zone. These pairings
+                  are ranked by how much more of your list each one opens up.
+                </p>
+                <PartnerOptions options={partnerOptions} />
               </section>
             )}
 

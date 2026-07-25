@@ -1,4 +1,5 @@
 import type { CardRow } from '../types';
+import { canPair, combineIdentity, type Pairing, type PairingKind } from './partners';
 
 export interface OwnedCard {
   row: CardRow;
@@ -22,6 +23,10 @@ export interface SupportingCard {
   quantity: number;
   typeLine: string | null;
   isGameChanger: boolean;
+  // Carried so the UI can show the card itself when one of these is tapped,
+  // rather than making the name a dead end.
+  imageUri: string | null;
+  scryfallUri: string | null;
 }
 
 /** A theme the commander shares with the list, and the cards behind it. */
@@ -151,7 +156,15 @@ function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
     quantity,
     typeLine: row.type_line,
     isGameChanger: !!row.game_changer,
+    imageUri: row.image_uri,
+    scryfallUri: row.scryfall_uri,
   };
+}
+
+/** Reads the pairing mechanic stored on a row at import time. */
+export function pairingOf(row: CardRow): Pairing | null {
+  if (!row.pairing_kind) return null;
+  return { kind: row.pairing_kind as PairingKind, label: row.pairing_label ?? null };
 }
 
 export function buildCollectionProfile(owned: OwnedCard[]): CollectionProfile {
@@ -265,4 +278,97 @@ export function scoreCommanders(
 
   suggestions.sort((a, b) => b.score - a.score);
   return suggestions;
+}
+
+/** A legal second commander, and what pairing with it would unlock. */
+export interface PartnerOption {
+  oracleId: string;
+  name: string;
+  imageUri: string | null;
+  scryfallUri: string | null;
+  typeLine: string | null;
+  manaCost: string | null;
+  colorIdentity: string[];
+  /** The pairing mechanic on the partner's side. */
+  mechanic: PairingKind;
+  /** Colour identity of the pair — the union of both halves. */
+  combinedIdentity: string[];
+  /** Cards from the list playable under the pair. */
+  combinedCardCount: number;
+  /** How many more than the commander alone allows. */
+  addedCardCount: number;
+}
+
+/**
+ * Counts the owned cards playable under a colour identity, memoised across
+ * calls — most partner options resolve to one of a handful of combined
+ * identities, so the same count is asked for many times over.
+ */
+function countOwnedFitting(owned: OwnedCard[], identity: string[], memo: Map<string, number>): number {
+  const key = [...identity].sort().join('');
+  const cached = memo.get(key);
+  if (cached !== undefined) return cached;
+
+  const allowed = new Set(identity);
+  let total = 0;
+  for (const entry of owned) {
+    if (parseJsonArray(entry.row.color_identity).every((c) => allowed.has(c))) {
+      total += entry.quantity;
+    }
+  }
+
+  memo.set(key, total);
+  return total;
+}
+
+/**
+ * Finds second commanders that could legally join this one, ranked by how
+ * much of the user's list the pair unlocks.
+ *
+ * The ranking is the whole point of surfacing these: a second commander
+ * widens the deck's colour identity, so the interesting question isn't
+ * "who can pair with this?" but "which pairing lets me actually play more of
+ * what I own?". Ties break on name so the order is stable between requests.
+ */
+export function buildPartnerOptions(
+  suggestion: CommanderSuggestion,
+  pairables: CardRow[],
+  owned: OwnedCard[],
+  memo: Map<string, number>,
+  limit = 4
+): PartnerOption[] {
+  const pairing = pairingOf(suggestion.card);
+  if (!pairing) return [];
+
+  const self = { name: suggestion.card.name, pairing };
+  const options: PartnerOption[] = [];
+
+  for (const candidate of pairables) {
+    const candidatePairing = pairingOf(candidate);
+    if (!candidatePairing) continue;
+    if (!canPair(self, { name: candidate.name, pairing: candidatePairing })) continue;
+
+    const combinedIdentity = combineIdentity(
+      parseJsonArray(suggestion.card.color_identity),
+      parseJsonArray(candidate.color_identity)
+    );
+    const combinedCardCount = countOwnedFitting(owned, combinedIdentity, memo);
+
+    options.push({
+      oracleId: candidate.oracle_id,
+      name: candidate.name,
+      imageUri: candidate.image_uri,
+      scryfallUri: candidate.scryfall_uri,
+      typeLine: candidate.type_line,
+      manaCost: candidate.mana_cost,
+      colorIdentity: parseJsonArray(candidate.color_identity),
+      mechanic: candidatePairing.kind,
+      combinedIdentity,
+      combinedCardCount,
+      addedCardCount: combinedCardCount - suggestion.includedCardCount,
+    });
+  }
+
+  options.sort((a, b) => b.addedCardCount - a.addedCardCount || a.name.localeCompare(b.name));
+  return options.slice(0, limit);
 }

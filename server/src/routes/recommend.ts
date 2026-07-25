@@ -1,7 +1,14 @@
 import { Router } from 'express';
-import { isSeeded, findCardsByNames, getCommanderCandidates } from '../db';
+import { isSeeded, findCardsByNames, getCommanderCandidates, getPairableCards } from '../db';
 import { parseCardList } from '../services/parseList';
-import { buildCollectionProfile, scoreCommanders, type OwnedCard } from '../services/synergy';
+import {
+  buildCollectionProfile,
+  buildPartnerOptions,
+  pairingOf,
+  scoreCommanders,
+  type OwnedCard,
+} from '../services/synergy';
+import { PAIRING_LABELS } from '../services/partners';
 import { estimateBracket } from '../services/bracket';
 
 const router = Router();
@@ -57,10 +64,17 @@ router.post('/recommend', (req, res) => {
   const candidates = getCommanderCandidates();
   const scored = scoreCommanders(candidates, profile, owned).slice(0, MAX_SUGGESTIONS);
 
+  // Partner options are only worked out for the slice actually being sent,
+  // and share one memo so the repeated "how much of the list fits this
+  // colour identity?" question is answered once per distinct identity.
+  const pairables = getPairableCards();
+  const identityCountMemo = new Map<string, number>();
+
   const suggestions = scored.map((s) => {
     // The commander itself counts toward the Bracket alongside any Game
     // Changers in the list that fit its colour identity.
     const gameChangerCount = (s.card.game_changer ? 1 : 0) + s.gameChangerCards.length;
+    const pairing = pairingOf(s.card);
 
     return {
       oracleId: s.card.oracle_id,
@@ -84,6 +98,10 @@ router.post('/recommend', (req, res) => {
       gameChangerCount,
       isGameChanger: !!s.card.game_changer,
       bracket: estimateBracket(gameChangerCount),
+      pairing: pairing
+        ? { kind: pairing.kind, label: pairing.label, mechanicName: PAIRING_LABELS[pairing.kind] }
+        : null,
+      partnerOptions: pairing ? buildPartnerOptions(s, pairables, owned, identityCountMemo) : [],
     };
   });
 
