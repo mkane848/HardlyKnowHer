@@ -1,5 +1,6 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ComboFinder } from './ComboFinder';
+import { CardDetailDialog } from './CardDetailDialog';
 import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
 import { ManaSymbol } from './ManaSymbol';
@@ -31,6 +32,26 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const dismiss = useAppStore((s) => s.dismiss);
+
+  // Whether the clamped rules text is actually cut off, so "Read more" only
+  // appears when there is more to read. Measured rather than guessed from
+  // character count: how many lines an ability takes depends on the column
+  // width, which changes as the grid reflows — hence the ResizeObserver
+  // rather than a single measurement on mount.
+  const oracleRef = useRef<HTMLSpanElement>(null);
+  const [isClamped, setIsClamped] = useState(false);
+
+  useEffect(() => {
+    const node = oracleRef.current;
+    if (!node) return;
+
+    const measure = () => setIsClamped(node.scrollHeight > node.clientHeight + 1);
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [suggestion.oracleText]);
 
   const hasReasons =
     suggestion.themeSupport.length > 0 ||
@@ -65,6 +86,24 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
         </div>
 
         {suggestion.typeLine && <p className="commander-type">{suggestion.typeLine}</p>}
+
+        {/* Rules text in a card's own reading order: name, types, then the
+            text box. Clamped so one wordy commander can't dominate the grid,
+            and tappable at any length to open the full card. */}
+        {suggestion.oracleText && (
+          <CardDetailDialog suggestion={suggestion}>
+            <button
+              type="button"
+              className="commander-oracle-button"
+              aria-label={`Show the full card for ${suggestion.name}`}
+            >
+              <span ref={oracleRef} className="commander-oracle">
+                {suggestion.oracleText}
+              </span>
+              {isClamped && <span className="oracle-more">Read more</span>}
+            </button>
+          </CardDetailDialog>
+        )}
 
         <div className="badge-row">
           <span className="badge badge-bracket">{suggestion.bracket.range}</span>
@@ -105,13 +144,8 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
 
         {hasReasons && expanded && (
           <div className="explain-panel" id={detailsId}>
-            {suggestion.oracleText && (
-              <section className="explain-section">
-                <h4 className="explain-heading">What it does</h4>
-                <p className="explain-oracle">{suggestion.oracleText}</p>
-              </section>
-            )}
-
+            {/* No "What it does" section here — the rules text is on the card
+                face now, so repeating it would just push the reasoning down. */}
             {suggestion.tribeSupport.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Tribal overlap</h4>

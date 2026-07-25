@@ -457,6 +457,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  /* Fill the card so the footer's margin-top:auto has slack to push against.
+     Without this the body is only as tall as its content and the footers sit
+     at ragged heights once rules text lengths differ. */
+  flex: 1;
 }
 
 .commander-name {
@@ -542,6 +546,49 @@ body {
   margin: 0;
 }
 
+/* The rules text box, and the button wrapping it that opens the full card. */
+.commander-oracle-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  margin: 0.15rem 0 0;
+  padding: 0.6rem 0.7rem;
+  background: rgba(36, 31, 22, 0.05);
+  border: 1px solid var(--parchment-dim);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.commander-oracle-button:hover {
+  background: rgba(36, 31, 22, 0.09);
+  border-color: var(--brass);
+}
+
+/* pre-line keeps the break between each ability, which is how oracle text is
+   written and how players scan it. Clamped to four lines so a wordy commander
+   doesn't set the height for its whole row. */
+.commander-oracle {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.oracle-more {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #7a5615;
+}
+
 .badge-row {
   display: flex;
   gap: 0.4rem;
@@ -592,7 +639,11 @@ body {
 .commander-bracket-note {
   font-size: 0.78rem;
   color: var(--ink-text-muted);
+  /* auto pushes the note and the toggle beneath it to the bottom of the
+     card, so those line up across a row even though rules text lengths
+     differ. Grid already equalises card heights within a row. */
   margin: 0.4rem 0 0;
+  margin-top: auto;
   padding-top: 0.5rem;
   border-top: 1px solid var(--parchment-dim);
 }
@@ -648,14 +699,6 @@ body {
   letter-spacing: 0.08em;
   color: var(--brass);
   margin: 0;
-}
-
-.explain-oracle {
-  font-size: 0.8rem;
-  line-height: 1.55;
-  color: var(--ink-text-muted);
-  margin: 0;
-  white-space: pre-line;
 }
 
 .explain-group {
@@ -723,6 +766,169 @@ body {
   background: rgba(198, 54, 42, 0.13);
   border-radius: 4px;
   padding: 0.05rem 0.25rem;
+}
+
+/* Card detail dialog */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 10, 7, 0.72);
+  backdrop-filter: blur(2px);
+  z-index: 20;
+}
+
+.dialog-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(94vw, 460px);
+  max-height: 90vh;
+  overflow-y: auto;
+  z-index: 21;
+  border-radius: 14px;
+}
+
+.dialog-card {
+  background: var(--parchment);
+  color: var(--ink-text);
+  border: 1px solid var(--parchment-dim);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.dialog-art {
+  width: 100%;
+  display: block;
+  aspect-ratio: 5 / 4;
+  object-fit: cover;
+  object-position: top;
+}
+
+.dialog-body {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.dialog-titlebar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dialog-name {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.mana-cost {
+  display: inline-flex;
+  gap: 0.18rem;
+  flex: none;
+  font-size: 0.95rem;
+}
+
+.pip-generic {
+  --pip-bg: #cdc3ad;
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  font-weight: 700;
+  color: #241f16;
+}
+
+.dialog-type {
+  font-size: 0.85rem;
+  color: var(--ink-text-muted);
+  margin: 0;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--parchment-dim);
+}
+
+.dialog-oracle {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  white-space: pre-line;
+  margin: 0;
+}
+
+.dialog-stats {
+  align-self: flex-end;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dialog-meta {
+  margin: 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--parchment-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.dialog-meta > div {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dialog-meta dt {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brass);
+  min-width: 8.5rem;
+}
+
+.dialog-meta dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dialog-pips {
+  display: inline-flex;
+  gap: 0.2rem;
+  font-size: 0.95rem;
+}
+
+.dialog-link {
+  font-size: 0.8rem;
+  color: #7a5615;
+}
+
+.dialog-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--ink-text);
+  background: rgba(244, 236, 216, 0.9);
+  border: 1px solid var(--parchment-dim);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.dialog-close:hover {
+  color: var(--pip-r);
 }
 
 /* Combo lookup */

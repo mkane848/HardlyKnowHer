@@ -14,6 +14,9 @@ export interface CardRow {
   color_identity: string; // JSON string[]
   keywords: string; // JSON string[]
   creature_types: string; // JSON string[]
+  power: string | null; // string, not number — can be "*" or "1+*"
+  toughness: string | null;
+  scryfall_uri: string | null;
   legality_commander: string; // "legal" | "banned" | "not_legal" | "restricted"
   game_changer: number; // 0 | 1
   is_legendary: number; // 0 | 1

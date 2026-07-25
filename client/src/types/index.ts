@@ -31,6 +31,10 @@ export interface CommanderSuggestionDTO {
   colorIdentity: string[];
   typeLine: string | null;
   oracleText: string | null;
+  manaCost: string | null;
+  power: string | null;
+  toughness: string | null;
+  scryfallUri: string | null;
   score: number;
   matchedThemes: string[];
   matchedCreatureTypes: string[];

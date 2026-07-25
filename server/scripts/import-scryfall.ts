@@ -45,6 +45,9 @@ db.exec(`
     color_identity TEXT,
     keywords TEXT,
     creature_types TEXT,
+    power TEXT,
+    toughness TEXT,
+    scryfall_uri TEXT,
     legality_commander TEXT,
     game_changer INTEGER DEFAULT 0,
     is_legendary INTEGER DEFAULT 0,
@@ -65,10 +68,12 @@ const insert = db.prepare(`
   INSERT OR REPLACE INTO cards (
     oracle_id, name, name_lower, mana_cost, cmc, type_line, oracle_text,
     colors, color_identity, keywords, creature_types,
+    power, toughness, scryfall_uri,
     legality_commander, game_changer, is_legendary, is_commander_eligible, image_uri
   ) VALUES (
     @oracle_id, @name, @name_lower, @mana_cost, @cmc, @type_line, @oracle_text,
     @colors, @color_identity, @keywords, @creature_types,
+    @power, @toughness, @scryfall_uri,
     @legality_commander, @game_changer, @is_legendary, @is_commander_eligible, @image_uri
   )
 `);
@@ -112,6 +117,11 @@ const insertMany = db.transaction((rows: any[]) => {
       color_identity: JSON.stringify(card.color_identity ?? []),
       keywords: JSON.stringify(card.keywords ?? []),
       creature_types: JSON.stringify(parseCreatureTypes(typeLine)),
+      // Kept so the card-detail dialog can show what a printed card shows,
+      // and link out to the real page rather than reimplementing it.
+      power: card.power ?? card.card_faces?.[0]?.power ?? null,
+      toughness: card.toughness ?? card.card_faces?.[0]?.toughness ?? null,
+      scryfall_uri: card.scryfall_uri ?? null,
       legality_commander: card.legalities?.commander ?? 'not_legal',
       game_changer: card.game_changer ? 1 : 0,
       is_legendary: isLegendary,
