@@ -42,3 +42,16 @@ export function getCommanderCandidates(): CardRow[] {
     )
     .all() as CardRow[];
 }
+
+/**
+ * Cards that can share a command zone with another card.
+ *
+ * Deliberately separate from getCommanderCandidates: a Background is a legal
+ * *second* commander but never a lone one, so it must not appear as a
+ * standalone suggestion.
+ */
+export function getPairableCards(): CardRow[] {
+  return db
+    .prepare(`SELECT * FROM cards WHERE pairing_kind IS NOT NULL AND legality_commander = 'legal'`)
+    .all() as CardRow[];
+}

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { detectPairing } from '../src/services/partners';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
@@ -52,10 +53,13 @@ db.exec(`
     game_changer INTEGER DEFAULT 0,
     is_legendary INTEGER DEFAULT 0,
     is_commander_eligible INTEGER DEFAULT 0,
-    image_uri TEXT
+    image_uri TEXT,
+    pairing_kind TEXT,
+    pairing_label TEXT
   );
   CREATE INDEX idx_cards_name_lower ON cards(name_lower);
   CREATE INDEX idx_cards_commander_eligible ON cards(is_commander_eligible);
+  CREATE INDEX idx_cards_pairing_kind ON cards(pairing_kind);
 `);
 
 function parseCreatureTypes(typeLine: string): string[] {
@@ -69,12 +73,14 @@ const insert = db.prepare(`
     oracle_id, name, name_lower, mana_cost, cmc, type_line, oracle_text,
     colors, color_identity, keywords, creature_types,
     power, toughness, scryfall_uri,
-    legality_commander, game_changer, is_legendary, is_commander_eligible, image_uri
+    legality_commander, game_changer, is_legendary, is_commander_eligible, image_uri,
+    pairing_kind, pairing_label
   ) VALUES (
     @oracle_id, @name, @name_lower, @mana_cost, @cmc, @type_line, @oracle_text,
     @colors, @color_identity, @keywords, @creature_types,
     @power, @toughness, @scryfall_uri,
-    @legality_commander, @game_changer, @is_legendary, @is_commander_eligible, @image_uri
+    @legality_commander, @game_changer, @is_legendary, @is_commander_eligible, @image_uri,
+    @pairing_kind, @pairing_label
   )
 `);
 
@@ -105,6 +111,11 @@ const insertMany = db.transaction((rows: any[]) => {
     const mentionsCommander = /can be your commander/i.test(oracleText);
     const isCommanderEligible = (isLegendary === 1 && isCreature) || mentionsCommander ? 1 : 0;
 
+    // Only legendary permanents can share a command zone, so checking the
+    // pairing text on anything else would just be a way to pick up false
+    // positives from cards that happen to use the same words.
+    const pairing = isLegendary === 1 ? detectPairing(typeLine, oracleText) : null;
+
     insert.run({
       oracle_id: card.oracle_id,
       name: card.name,
@@ -127,6 +138,8 @@ const insertMany = db.transaction((rows: any[]) => {
       is_legendary: isLegendary,
       is_commander_eligible: isCommanderEligible,
       image_uri: imageUri,
+      pairing_kind: pairing?.kind ?? null,
+      pairing_label: pairing?.label ?? null,
     });
     imported++;
   }
@@ -147,5 +160,18 @@ const gameChangers = db
 console.log(`${eligible.c} cards are Commander-eligible.`);
 console.log(`${banned.c} cards are currently banned in Commander.`);
 console.log(`${gameChangers.c} cards are on the Game Changers list.`);
+
+const pairings = db
+  .prepare(
+    `SELECT pairing_kind AS kind, COUNT(*) AS c FROM cards
+     WHERE pairing_kind IS NOT NULL GROUP BY pairing_kind ORDER BY c DESC`
+  )
+  .all() as { kind: string; c: number }[];
+if (pairings.length > 0) {
+  console.log(`\nCommand-zone pairing mechanics detected:`);
+  for (const { kind, c } of pairings) {
+    console.log(`  ${kind}: ${c}`);
+  }
+}
 
 db.close();

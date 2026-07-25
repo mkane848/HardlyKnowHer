@@ -13,7 +13,7 @@ import {
   modeOf,
   type FilterSelection,
 } from '../src/lib/filters';
-import { makeSuggestion } from './fixtures';
+import { makeSuggestion, makeSupportingCard } from './fixtures';
 
 let failures = 0;
 function check(label: string, fn: () => void) {
@@ -81,8 +81,8 @@ check('colour exclude drops anything touching an excluded colour', () => {
 
 // --- theme filtering (AND include, OR exclude, visible-only) -----------
 
-const sac = { key: 'sacrifice', label: 'Sacrifice', description: '', cards: [{ name: 'A', quantity: 1, typeLine: null, isGameChanger: false }] };
-const tokens = { key: 'tokens', label: 'Tokens', description: '', cards: [{ name: 'B', quantity: 1, typeLine: null, isGameChanger: false }] };
+const sac = { key: 'sacrifice', label: 'Sacrifice', description: '', cards: [makeSupportingCard({ name: 'A' })] };
+const tokens = { key: 'tokens', label: 'Tokens', description: '', cards: [makeSupportingCard({ name: 'B' })] };
 const emptyTheme = { key: 'graveyard', label: 'Graveyard', description: '', cards: [] };
 
 check('theme include requires every selected theme to be present', () => {

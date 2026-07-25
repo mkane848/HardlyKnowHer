@@ -10,7 +10,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc",
-    "test": "tsx scripts/test-parse-list.ts && tsx scripts/test-spellbook.ts && tsx scripts/test-bracket.ts && tsx scripts/test-synergy.ts",
+    "test": "tsx scripts/test-parse-list.ts && tsx scripts/test-spellbook.ts && tsx scripts/test-bracket.ts && tsx scripts/test-partners.ts && tsx scripts/test-synergy.ts",
     "start": "node dist/index.js",
     "fetch-scryfall": "tsx scripts/fetch-scryfall.ts",
     "import-scryfall": "tsx scripts/import-scryfall.ts",

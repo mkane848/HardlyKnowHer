@@ -11,7 +11,7 @@ import {
   visibleTribeSupport,
   visibleTribeTypes,
 } from '../src/lib/suggestions';
-import { makeSuggestion } from './fixtures';
+import { makeSuggestion, makeSupportingCard } from './fixtures';
 
 let failures = 0;
 function check(label: string, fn: () => void) {
@@ -25,7 +25,7 @@ function check(label: string, fn: () => void) {
   }
 }
 
-const withCards = { key: 'sacrifice', label: 'Sacrifice', description: '', cards: [{ name: 'Fake Card', quantity: 1, typeLine: null, isGameChanger: false }] };
+const withCards = { key: 'sacrifice', label: 'Sacrifice', description: '', cards: [makeSupportingCard()] };
 const empty = { key: 'tokens', label: 'Tokens', description: '', cards: [] };
 
 check('visibleThemeSupport drops themes with zero supporting cards', () => {
@@ -37,7 +37,7 @@ check('visibleTribeSupport drops tribes with zero supporting cards', () => {
   const suggestion = makeSuggestion({
     tribeSupport: [
       { type: 'Goblin', cards: [] },
-      { type: 'Elf', cards: [{ name: 'Fake Elf', quantity: 2, typeLine: null, isGameChanger: false }] },
+      { type: 'Elf', cards: [makeSupportingCard({ name: 'Fake Elf', quantity: 2 })] },
     ],
   });
   assert.deepStrictEqual(visibleTribeSupport(suggestion).map((t) => t.type), ['Elf']);

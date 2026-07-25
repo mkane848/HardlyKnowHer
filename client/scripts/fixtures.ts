@@ -1,4 +1,17 @@
-import type { CommanderSuggestionDTO } from '../src/types';
+import type { CommanderSuggestionDTO, SupportingCardDTO } from '../src/types';
+
+/** A supporting card, for tests that only care about its name/quantity. */
+export function makeSupportingCard(overrides: Partial<SupportingCardDTO> = {}): SupportingCardDTO {
+  return {
+    name: 'Fake Card',
+    quantity: 1,
+    typeLine: null,
+    isGameChanger: false,
+    imageUri: null,
+    scryfallUri: null,
+    ...overrides,
+  };
+}
 
 /** A minimally-filled suggestion, so each test only has to spell out the
  * fields it actually cares about. */
@@ -25,6 +38,8 @@ export function makeSuggestion(overrides: Partial<CommanderSuggestionDTO> = {}):
     gameChangerCount: 0,
     isGameChanger: false,
     bracket: { label: 'Exhibition / Core', range: 'Bracket 1–2', note: '' },
+    pairing: null,
+    partnerOptions: [],
     ...overrides,
   };
 }

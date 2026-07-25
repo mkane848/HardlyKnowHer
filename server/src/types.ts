@@ -22,4 +22,9 @@ export interface CardRow {
   is_legendary: number; // 0 | 1
   is_commander_eligible: number; // 0 | 1
   image_uri: string | null;
+  // Command-zone pairing mechanic (Partner, Background, etc.), computed at
+  // import time by services/partners. Null for the vast majority of cards.
+  pairing_kind: string | null;
+  // The card named by "Partner with", or the group label for "Partner — X".
+  pairing_label: string | null;
 }

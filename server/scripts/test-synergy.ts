@@ -8,7 +8,12 @@
  */
 import assert from 'node:assert';
 import type { CardRow } from '../src/types';
-import { buildCollectionProfile, scoreCommanders, type OwnedCard } from '../src/services/synergy';
+import {
+  buildCollectionProfile,
+  buildPartnerOptions,
+  scoreCommanders,
+  type OwnedCard,
+} from '../src/services/synergy';
 
 let failures = 0;
 function check(label: string, fn: () => void) {
@@ -45,6 +50,8 @@ function makeCard(overrides: Partial<CardRow> = {}): CardRow {
     is_legendary: 0,
     is_commander_eligible: 0,
     image_uri: null,
+    pairing_kind: null,
+    pairing_label: null,
     ...overrides,
   };
 }
@@ -163,6 +170,90 @@ check('suggestions are sorted by score, descending, driven by coverage of the ow
     'the commander covering more of the list should score, and sort, higher'
   );
   assert.ok(suggestions[0].score > suggestions[1].score);
+});
+
+// --- partner options -----------------------------------------------------
+
+/** A mono-white Partner commander plus a list that reaches outside white. */
+function partnerScenario() {
+  const whiteA = makeCard({ name: 'White Sac A', color_identity: '["W"]', oracle_text: 'Sacrifice a creature.' });
+  const whiteB = makeCard({ name: 'White Sac B', color_identity: '["W"]', oracle_text: 'Sacrifice a creature.' });
+  const blue1 = makeCard({ name: 'Blue Card 1', color_identity: '["U"]' });
+  const blue2 = makeCard({ name: 'Blue Card 2', color_identity: '["U"]' });
+  const green1 = makeCard({ name: 'Green Card', color_identity: '["G"]' });
+  const owned = owns([whiteA, whiteB, blue1, blue2, green1]);
+
+  const commander = makeCard({
+    name: 'White Partner Commander',
+    color_identity: '["W"]',
+    oracle_text: 'Sacrifice a creature: draw a card.\nPartner (You can have two commanders if both have partner.)',
+    pairing_kind: 'partner',
+  });
+
+  const profile = buildCollectionProfile(owned);
+  const [suggestion] = scoreCommanders([commander], profile, owned);
+  return { suggestion, owned };
+}
+
+check('partner options rank by how much more of the list each pairing unlocks', () => {
+  const { suggestion, owned } = partnerScenario();
+
+  const bluePartner = makeCard({ name: 'Blue Partner', color_identity: '["U"]', pairing_kind: 'partner' });
+  const greenPartner = makeCard({ name: 'Green Partner', color_identity: '["G"]', pairing_kind: 'partner' });
+
+  const options = buildPartnerOptions(suggestion, [bluePartner, greenPartner], owned, new Map());
+
+  assert.strictEqual(options.length, 2);
+  // Blue unlocks two cards, green only one, so blue sorts first.
+  assert.strictEqual(options[0].name, 'Blue Partner');
+  assert.strictEqual(options[0].addedCardCount, 2);
+  assert.deepStrictEqual(options[0].combinedIdentity.sort(), ['U', 'W']);
+  assert.strictEqual(options[1].name, 'Green Partner');
+  assert.strictEqual(options[1].addedCardCount, 1);
+});
+
+check('partner options exclude cards that cannot legally pair', () => {
+  const { suggestion, owned } = partnerScenario();
+
+  const background = makeCard({ name: 'Some Background', color_identity: '["U"]', pairing_kind: 'background' });
+  const partnerWith = makeCard({
+    name: 'Specific Partner',
+    color_identity: '["U"]',
+    pairing_kind: 'partner-with',
+    pairing_label: 'Someone Else',
+  });
+
+  const options = buildPartnerOptions(suggestion, [background, partnerWith], owned, new Map());
+  assert.deepStrictEqual(options, []);
+});
+
+check('a commander with no pairing mechanic gets no options', () => {
+  const plain = makeCard({ name: 'Plain Commander', color_identity: '["W"]' });
+  const owned = owns([
+    makeCard({ name: 'W1', color_identity: '["W"]', creature_types: '["Elf"]' }),
+    makeCard({ name: 'W2', color_identity: '["W"]', creature_types: '["Elf"]' }),
+  ]);
+  const profile = buildCollectionProfile(owned);
+  const commander = makeCard({ name: 'Plain Commander', color_identity: '["W"]', creature_types: '["Elf"]' });
+  const [suggestion] = scoreCommanders([commander], profile, owned);
+
+  assert.ok(suggestion);
+  assert.deepStrictEqual(buildPartnerOptions(suggestion, [plain], owned, new Map()), []);
+});
+
+check('the identity-count memo is shared across calls and reused', () => {
+  const { suggestion, owned } = partnerScenario();
+  const memo = new Map<string, number>();
+
+  const blueA = makeCard({ name: 'Blue Partner A', color_identity: '["U"]', pairing_kind: 'partner' });
+  const blueB = makeCard({ name: 'Blue Partner B', color_identity: '["U"]', pairing_kind: 'partner' });
+
+  const options = buildPartnerOptions(suggestion, [blueA, blueB], owned, memo);
+
+  // Both resolve to the same combined identity, so it is only counted once.
+  assert.strictEqual(options.length, 2);
+  assert.strictEqual(memo.size, 1);
+  assert.strictEqual(options[0].addedCardCount, options[1].addedCardCount);
 });
 
 if (failures > 0) {
