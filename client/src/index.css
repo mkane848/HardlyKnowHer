@@ -204,6 +204,13 @@ body {
   color: var(--text-muted);
 }
 
+.status-waking {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--brass-bright);
+  margin: 0;
+}
+
 .results-summary {
   display: flex;
   align-items: center;

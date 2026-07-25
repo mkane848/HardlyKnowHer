@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useRecommendations } from '../api/queries';
 
@@ -13,6 +13,18 @@ export function CardListUpload() {
 
   // Same cache entry the results section reads — no state passed between them.
   const { isFetching } = useRecommendations(submittedList);
+
+  // A request that runs past a few seconds is almost always the free instance
+  // waking up. Say so, rather than leaving a spinner to look like a hang.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!isFetching) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(timer);
+  }, [isFetching]);
 
   async function handleFile(file: File) {
     const text = await file.text();
@@ -45,6 +57,12 @@ export function CardListUpload() {
         spellCheck={false}
       />
       {validationError && <p className="status-error">{validationError}</p>}
+      {slow && (
+        <p className="status-waking" aria-live="polite">
+          Waking the server — it sleeps after a spell of inactivity, so the first request can take up
+          to a minute.
+        </p>
+      )}
       <div className="upload-actions">
         <label className="file-button">
           Upload .txt

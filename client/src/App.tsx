@@ -1,7 +1,13 @@
+import { useEffect } from 'react';
 import { CardListUpload } from './components/CardListUpload';
 import { RecommendationResults } from './components/RecommendationResults';
+import { wakeServer } from './api/client';
 
 function App() {
+  // Start waking the API immediately, so a sleeping free instance is usually
+  // up by the time anyone finishes pasting a list.
+  useEffect(wakeServer, []);
+
   return (
     <div className="app-shell">
       <header className="app-header">
