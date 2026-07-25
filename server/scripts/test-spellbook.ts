@@ -59,7 +59,9 @@ async function main() {
   const { port } = server.address() as AddressInfo;
   process.env.SPELLBOOK_ENDPOINT = `http://127.0.0.1:${port}/find-my-combos`;
 
-  const { findCombos, clearComboCache, SpellbookError } = await import('../src/services/spellbook');
+  // The .js extension is required for a dynamic ESM import under
+  // moduleResolution node16; tsx maps it back to the .ts source at runtime.
+  const { findCombos, clearComboCache, SpellbookError } = await import('../src/services/spellbook.js');
 
   await check('normalises nested {card:{name}} / {feature:{name}} shapes', async () => {
     clearComboCache();
