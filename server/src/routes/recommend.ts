@@ -6,6 +6,12 @@ import { estimateBracket } from '../services/bracket';
 
 const router = Router();
 
+// Deep enough that the client's colour/bracket/theme filters have something
+// to narrow, while staying a single response — the client paginates it.
+// Scoring already ran over every eligible commander, so a larger slice costs
+// nothing but response size.
+const MAX_SUGGESTIONS = 30;
+
 function parseJsonArray(value: string | null): string[] {
   if (!value) return [];
   try {
@@ -46,7 +52,7 @@ router.post('/recommend', (req, res) => {
 
   const profile = buildCollectionProfile(owned);
   const candidates = getCommanderCandidates();
-  const scored = scoreCommanders(candidates, profile, owned).slice(0, 10);
+  const scored = scoreCommanders(candidates, profile, owned).slice(0, MAX_SUGGESTIONS);
 
   const suggestions = scored.map((s) => {
     // The commander itself counts toward the Bracket alongside any Game

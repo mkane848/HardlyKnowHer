@@ -231,6 +231,167 @@ body {
   gap: 1.25rem;
 }
 
+/* Filters */
+
+.filter-bar {
+  background: var(--ink-raised);
+  border: 1px solid var(--ink-border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  min-width: 4.5rem;
+}
+
+.filter-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.toggle-group {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.toggle-pip {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  padding: 0.2rem;
+  line-height: 0;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.toggle-pip .pip {
+  font-size: 1.1rem;
+}
+
+.toggle-pip:hover {
+  opacity: 0.8;
+}
+
+.toggle-pip[data-state='on'] {
+  opacity: 1;
+  border-color: var(--brass-bright);
+}
+
+.toggle-chip {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.toggle-chip:hover {
+  border-color: var(--brass);
+  color: var(--text-primary);
+}
+
+.toggle-chip[data-state='on'] {
+  background: rgba(184, 132, 42, 0.2);
+  border-color: var(--brass-bright);
+  color: var(--text-primary);
+}
+
+.filter-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid var(--ink-border);
+  margin-top: 0.1rem;
+  padding-top: 0.75rem;
+}
+
+.filter-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.filter-clear,
+.link-button {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--brass-bright);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link-button {
+  margin-left: 0.5rem;
+}
+
+.dismissed-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Pagination */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  margin-top: 1.75rem;
+}
+
+.page-button {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 8px;
+  padding: 0.5rem 0.95rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.page-button:hover:not(:disabled) {
+  border-color: var(--brass);
+}
+
+.page-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-status {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .commander-card {
   background: var(--parchment);
   color: var(--ink-text);
@@ -239,6 +400,48 @@ body {
   border: 1px solid var(--parchment-dim);
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.dismiss-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--ink-text-muted);
+  background: rgba(244, 236, 216, 0.85);
+  border: 1px solid var(--parchment-dim);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+/* Revealed on hover, but never invisible while focused — :focus as well as
+   :focus-visible, so the control can't be focused-but-unseen however focus
+   arrived. Always visible on touch, where there is no hover to reveal it. */
+.commander-card:hover .dismiss-button,
+.commander-card:focus-within .dismiss-button,
+.dismiss-button:focus,
+.dismiss-button:focus-visible {
+  opacity: 1;
+}
+
+.dismiss-button:hover {
+  color: var(--pip-r);
+}
+
+@media (hover: none) {
+  .dismiss-button {
+    opacity: 1;
+  }
 }
 
 .commander-image {
@@ -266,45 +469,71 @@ body {
 
 .pip-row {
   display: flex;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.3rem;
 }
 
+/* Mana pip: coloured disc here, glyph from inlined SVG (see ManaSymbol).
+   Mirrors how printed symbols look — coloured circle, dark glyph, soft
+   shadow. */
 .pip {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  --pip-bg: var(--pip-c);
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 600;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+  background: var(--pip-bg);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.pip svg {
+  width: 68%;
+  height: 68%;
+  display: block;
+  fill: rgba(20, 16, 10, 0.82);
 }
 
 .pip-w {
-  background: var(--pip-w);
-  color: #241f16;
+  --pip-bg: var(--pip-w);
 }
 .pip-u {
-  background: var(--pip-u);
-  color: #fff;
+  --pip-bg: var(--pip-u);
 }
 .pip-b {
-  background: var(--pip-b);
-  color: #f4ecd8;
+  --pip-bg: var(--pip-b);
 }
 .pip-r {
-  background: var(--pip-r);
-  color: #fff;
+  --pip-bg: var(--pip-r);
 }
 .pip-g {
-  background: var(--pip-g);
-  color: #fff;
+  --pip-bg: var(--pip-g);
 }
 .pip-c {
-  background: var(--pip-c);
-  color: #fff;
+  --pip-bg: var(--pip-c);
+}
+
+/* The dark colours need a light glyph to stay legible. */
+.pip-b svg,
+.pip-u svg,
+.pip-r svg,
+.pip-g svg {
+  fill: rgba(248, 244, 227, 0.92);
+}
+
+.pip-row .pip {
+  font-size: 1.05rem;
+}
+
+.identity-name {
+  margin-left: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
 }
 
 .commander-type {

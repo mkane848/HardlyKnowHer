@@ -49,6 +49,23 @@ That's a much weaker guarantee than actually running it.
 All explicitly requested by the user unless noted:
 
 - **Vite + React + TypeScript** (client)
+- **MTG presentation conventions** live in `client/src/lib/mtg.ts`: colours are
+  always shown in WUBRG order (never alphabetical, never raw data order), and
+  a colour identity is named — "Golgari", not "Black/Green" — because that's
+  what players read. Symbols are the real mana glyphs, inlined as SVG paths in
+  `lib/manaSymbols.ts` and drawn by `components/ManaSymbol.tsx`.
+  These came from the `mana-font` package (MIT), but **the package itself is
+  deliberately not a dependency**: its stylesheet offers no woff2, so a
+  browser downloads a ~408KB `.woff` plus an unused body-text face to render
+  six pips. Six inlined paths cost ~12KB of markup instead. Don't "simplify"
+  this back to the font without re-checking that trade.
+
+- **Radix UI** for interactive controls that need real keyboard and
+  screen-reader behaviour (the filter toggle groups). TanStack has no
+  equivalent — it ships data and interaction *logic*, not accessible UI
+  primitives — so the two are used side by side rather than one instead of
+  the other.
+
 - **Zustand + TanStack Query** for state, split by what the state *is*:
   Zustand (`client/src/store/useAppStore.ts`) holds client state only — the
   textarea contents and the list that was actually submitted — and is where a

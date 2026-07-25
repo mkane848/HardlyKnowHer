@@ -14,13 +14,37 @@ interface AppState {
   rawList: string;
   /** The list actually submitted — the key everything server-side hangs off. */
   submittedList: string;
+  /** oracleIds the user has dismissed from the current results. */
+  dismissed: string[];
   setRawList: (text: string) => void;
   submitList: (text: string) => void;
+  dismiss: (oracleId: string) => void;
+  restore: (oracleId: string) => void;
+  restoreAll: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
   rawList: '',
   submittedList: '',
+  dismissed: [],
+
   setRawList: (rawList) => set({ rawList }),
-  submitList: (submittedList) => set({ submittedList }),
+
+  // Dismissals belong to the list they were made against, so a genuinely new
+  // list starts clean. Re-submitting the same text keeps them, since that is
+  // the same set of results the user was already curating.
+  submitList: (submittedList) =>
+    set((state) => ({
+      submittedList,
+      dismissed: submittedList === state.submittedList ? state.dismissed : [],
+    })),
+
+  dismiss: (oracleId) =>
+    set((state) => ({
+      dismissed: state.dismissed.includes(oracleId) ? state.dismissed : [...state.dismissed, oracleId],
+    })),
+
+  restore: (oracleId) => set((state) => ({ dismissed: state.dismissed.filter((id) => id !== oracleId) })),
+
+  restoreAll: () => set({ dismissed: [] }),
 }));

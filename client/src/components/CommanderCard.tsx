@@ -1,14 +1,9 @@
 import { useId, useState } from 'react';
 import { ComboFinder } from './ComboFinder';
+import { useAppStore } from '../store/useAppStore';
+import { identityName, sortWubrg } from '../lib/mtg';
+import { ManaSymbol } from './ManaSymbol';
 import type { CommanderSuggestionDTO, SupportingCardDTO } from '../types';
-
-const COLOR_LABELS: Record<string, string> = {
-  W: 'White',
-  U: 'Blue',
-  B: 'Black',
-  R: 'Red',
-  G: 'Green',
-};
 
 function cardCount(cards: SupportingCardDTO[]): number {
   return cards.reduce((sum, card) => sum + card.quantity, 0);
@@ -35,6 +30,7 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
 export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
+  const dismiss = useAppStore((s) => s.dismiss);
 
   const hasReasons =
     suggestion.themeSupport.length > 0 ||
@@ -46,21 +42,26 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
       {suggestion.imageUri && (
         <img className="commander-image" src={suggestion.imageUri} alt={suggestion.name} loading="lazy" />
       )}
+      <button
+        type="button"
+        className="dismiss-button"
+        onClick={() => dismiss(suggestion.oracleId)}
+        aria-label={`Dismiss ${suggestion.name}`}
+        title="Dismiss this suggestion"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+
       <div className="commander-body">
         <h3 className="commander-name">{suggestion.name}</h3>
 
         <div className="pip-row">
           {suggestion.colorIdentity.length === 0 ? (
-            <span className="pip pip-c" title="Colorless">
-              C
-            </span>
+            <ManaSymbol color="C" />
           ) : (
-            suggestion.colorIdentity.map((color) => (
-              <span key={color} className={`pip pip-${color.toLowerCase()}`} title={COLOR_LABELS[color] ?? color}>
-                {color}
-              </span>
-            ))
+            sortWubrg(suggestion.colorIdentity).map((color) => <ManaSymbol key={color} color={color} />)
           )}
+          <span className="identity-name">{identityName(suggestion.colorIdentity)}</span>
         </div>
 
         {suggestion.typeLine && <p className="commander-type">{suggestion.typeLine}</p>}
