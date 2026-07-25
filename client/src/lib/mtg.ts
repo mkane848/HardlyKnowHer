@@ -12,7 +12,7 @@
 
 export const WUBRG = ['W', 'U', 'B', 'R', 'G'] as const;
 
-const COLOR_ORDER = new Map<string, number>(WUBRG.map((color, index) => [color, index]));
+export const COLOR_ORDER = new Map<string, number>(WUBRG.map((color, index) => [color, index]));
 
 export const COLOR_LABELS: Record<string, string> = {
   W: 'White',

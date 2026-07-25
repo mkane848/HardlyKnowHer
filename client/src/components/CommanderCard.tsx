@@ -3,6 +3,7 @@ import { ComboFinder } from './ComboFinder';
 import { CardDetailDialog } from './CardDetailDialog';
 import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
+import { visibleThemeSupport, visibleTribeSupport } from '../lib/suggestions';
 import { ManaSymbol } from './ManaSymbol';
 import type { CommanderSuggestionDTO, SupportingCardDTO } from '../types';
 
@@ -30,8 +31,18 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
 
 export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
   const [expanded, setExpanded] = useState(false);
+  const [showFullArt, setShowFullArt] = useState(false);
   const detailsId = useId();
   const dismiss = useAppStore((s) => s.dismiss);
+
+  // Themes/tribes the collection profile matched globally can still end up
+  // with zero cards once narrowed to ones that fit this commander's colour
+  // identity — that's not a real reason to suggest it, so it's filtered out
+  // here rather than shown as an empty group.
+  const tribeSupport = visibleTribeSupport(suggestion);
+  const themeSupport = visibleThemeSupport(suggestion);
+  const tribeTypes = tribeSupport.map((t) => t.type);
+  const themeLabels = themeSupport.map((t) => t.label);
 
   // Whether the clamped rules text is actually cut off, so "Read more" only
   // appears when there is more to read. Measured rather than guessed from
@@ -53,15 +64,25 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
     return () => observer.disconnect();
   }, [suggestion.oracleText]);
 
-  const hasReasons =
-    suggestion.themeSupport.length > 0 ||
-    suggestion.tribeSupport.length > 0 ||
-    suggestion.gameChangerCards.length > 0;
+  const hasReasons = themeSupport.length > 0 || tribeSupport.length > 0 || suggestion.gameChangerCards.length > 0;
 
   return (
     <article className={`commander-card${expanded ? ' is-expanded' : ''}`}>
       {suggestion.imageUri && (
-        <img className="commander-image" src={suggestion.imageUri} alt={suggestion.name} loading="lazy" />
+        <div className={`commander-art${showFullArt ? ' is-showing-full-art' : ''}`}>
+          <button
+            type="button"
+            className="commander-art-trigger"
+            onClick={() => setShowFullArt((open) => !open)}
+            aria-label={
+              showFullArt ? `Hide full art for ${suggestion.name}` : `Show full art for ${suggestion.name}`
+            }
+            aria-pressed={showFullArt}
+          >
+            <img className="commander-image" src={suggestion.imageUri} alt={suggestion.name} loading="lazy" />
+          </button>
+          <img className="commander-art-preview" src={suggestion.imageUri} alt="" aria-hidden loading="lazy" />
+        </div>
       )}
       <button
         type="button"
@@ -114,14 +135,14 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
           Fits {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} from your list
         </p>
 
-        {suggestion.matchedCreatureTypes.length > 0 && (
+        {tribeTypes.length > 0 && (
           <p className="commander-tags">
-            <span className="commander-tags-label">Tribal</span> {suggestion.matchedCreatureTypes.join(', ')}
+            <span className="commander-tags-label">Tribal</span> {tribeTypes.join(', ')}
           </p>
         )}
-        {suggestion.matchedThemes.length > 0 && (
+        {themeLabels.length > 0 && (
           <p className="commander-tags">
-            <span className="commander-tags-label">Themes</span> {suggestion.matchedThemes.join(', ')}
+            <span className="commander-tags-label">Themes</span> {themeLabels.join(', ')}
           </p>
         )}
 
@@ -146,10 +167,10 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
           <div className="explain-panel" id={detailsId}>
             {/* No "What it does" section here — the rules text is on the card
                 face now, so repeating it would just push the reasoning down. */}
-            {suggestion.tribeSupport.length > 0 && (
+            {tribeSupport.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Tribal overlap</h4>
-                {suggestion.tribeSupport.map((tribe) => (
+                {tribeSupport.map((tribe) => (
                   <div key={tribe.type} className="explain-group">
                     <p className="explain-group-title">
                       {tribe.type} <span className="explain-count">{cardCount(tribe.cards)} in your list</span>
@@ -163,10 +184,10 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
               </section>
             )}
 
-            {suggestion.themeSupport.length > 0 && (
+            {themeSupport.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Themes you're already building</h4>
-                {suggestion.themeSupport.map((theme) => (
+                {themeSupport.map((theme) => (
                   <div key={theme.key} className="explain-group">
                     <p className="explain-group-title">
                       {theme.label} <span className="explain-count">{cardCount(theme.cards)} in your list</span>

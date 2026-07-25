@@ -32,6 +32,7 @@ export interface CommanderSuggestionDTO {
   typeLine: string | null;
   oracleText: string | null;
   manaCost: string | null;
+  manaValue: number | null;
   power: string | null;
   toughness: string | null;
   scryfallUri: string | null;

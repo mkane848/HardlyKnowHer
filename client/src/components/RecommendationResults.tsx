@@ -8,11 +8,61 @@ import {
 import { useAppStore } from '../store/useAppStore';
 import { useRecommendations } from '../api/queries';
 import { applyFilters, availableFilterValues, EMPTY_FILTERS, hasActiveFilters } from '../lib/filters';
+import { sortSuggestions, type SortMode } from '../lib/sort';
 import { CommanderCard } from './CommanderCard';
 import { ResultFilters } from './ResultFilters';
 import type { CommanderSuggestionDTO } from '../types';
 
 const PAGE_SIZE = 9;
+const EXPORT_FILENAME = 'commander-suggestions.txt';
+
+function toExportText(suggestions: CommanderSuggestionDTO[]): string {
+  return suggestions.map((s) => s.name).join('\n');
+}
+
+function downloadTextFile(filename: string, text: string) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Copy button feedback resets on its own after a beat, same idea as the
+ * "waking the server" notice elsewhere — confirm, then get out of the way. */
+function ExportControls({ suggestions }: { suggestions: CommanderSuggestionDTO[] }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(toExportText(suggestions));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be denied by the browser; the download button
+      // next to this one still works, so there's no need to surface an error.
+    }
+  }
+
+  return (
+    <div className="export-controls">
+      <button type="button" className="export-button" onClick={handleCopy}>
+        {copied ? 'Copied!' : 'Copy list'}
+      </button>
+      <button
+        type="button"
+        className="export-button"
+        onClick={() => downloadTextFile(EXPORT_FILENAME, toExportText(suggestions))}
+      >
+        Download .txt
+      </button>
+    </div>
+  );
+}
 
 export function RecommendationResults() {
   const submittedList = useAppStore((s) => s.submittedList);
@@ -21,6 +71,7 @@ export function RecommendationResults() {
   const { data: result, error } = useRecommendations(submittedList);
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [sortMode, setSortMode] = useState<SortMode>('relevance');
 
   const suggestions = useMemo(() => result?.suggestions ?? [], [result]);
 
@@ -32,19 +83,21 @@ export function RecommendationResults() {
     [suggestions, dismissed]
   );
   const filtered = useMemo(() => applyFilters(kept, filters), [kept, filters]);
+  const sorted = useMemo(() => sortSuggestions(filtered, sortMode), [filtered, sortMode]);
   const { brackets, themes } = useMemo(() => availableFilterValues(kept), [kept]);
 
   // TanStack Table is used headlessly here, purely for the pagination state
-  // machine — page bounds, and resetting to page 1 when filtering changes the
-  // row count under you. Filtering itself stays a plain function in lib, since
-  // these filters cut across the whole row rather than down one column.
+  // machine — page bounds, and resetting to page 1 when filtering or sorting
+  // changes the row set under you. Filtering and sorting themselves stay
+  // plain functions in lib, since they cut across the whole row rather than
+  // down one column.
   const columns = useMemo<ColumnDef<CommanderSuggestionDTO>[]>(
     () => [{ id: 'suggestion', accessorKey: 'oracleId' }],
     []
   );
 
   const table = useReactTable({
-    data: filtered,
+    data: sorted,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -87,6 +140,7 @@ export function RecommendationResults() {
             </button>
           </span>
         )}
+        {sorted.length > 0 && <ExportControls suggestions={sorted} />}
       </div>
 
       {suggestions.length === 0 ? (
@@ -100,6 +154,8 @@ export function RecommendationResults() {
             onChange={setFilters}
             availableBrackets={brackets}
             availableThemes={themes}
+            sortMode={sortMode}
+            onSortModeChange={setSortMode}
             shown={filtered.length}
             total={kept.length}
           />
