@@ -1,10 +1,18 @@
 /**
- * Tests for the suggestion filter bar: colour subset/category matching,
- * theme AND-ing, bracket matching, and how available filter values are
- * derived from the results themselves. Run with: npm test
+ * Tests for the include/exclude filter facets: the off -> include -> exclude
+ * -> off state machine, and how each facet applies to a suggestion list.
+ * Run with: npm test
  */
 import assert from 'node:assert';
-import { applyFilters, availableFilterValues, EMPTY_FILTERS, hasActiveFilters } from '../src/lib/filters';
+import {
+  applyFilters,
+  availableFilterValues,
+  cycleSelection,
+  EMPTY_FILTERS,
+  hasActiveFilters,
+  modeOf,
+  type FilterSelection,
+} from '../src/lib/filters';
 import { makeSuggestion, makeSupportingCard } from './fixtures';
 
 let failures = 0;
@@ -19,51 +27,120 @@ function check(label: string, fn: () => void) {
   }
 }
 
-check('hasActiveFilters is false only when every facet is empty', () => {
-  assert.strictEqual(hasActiveFilters(EMPTY_FILTERS), false);
-  assert.strictEqual(hasActiveFilters({ ...EMPTY_FILTERS, colors: ['W'] }), true);
-  assert.strictEqual(hasActiveFilters({ ...EMPTY_FILTERS, colorCategory: 'colorless' }), true);
-  assert.strictEqual(hasActiveFilters({ ...EMPTY_FILTERS, brackets: ['Bracket 3'] }), true);
-  assert.strictEqual(hasActiveFilters({ ...EMPTY_FILTERS, themes: ['Tokens'] }), true);
+// --- state machine -----------------------------------------------------
+
+check('cycleSelection goes off -> include -> exclude -> off', () => {
+  let selection: FilterSelection = { include: [], exclude: [] };
+  assert.strictEqual(modeOf(selection, 'W'), null);
+
+  selection = cycleSelection(selection, 'W');
+  assert.strictEqual(modeOf(selection, 'W'), 'include');
+
+  selection = cycleSelection(selection, 'W');
+  assert.strictEqual(modeOf(selection, 'W'), 'exclude');
+
+  selection = cycleSelection(selection, 'W');
+  assert.strictEqual(modeOf(selection, 'W'), null);
+  assert.deepStrictEqual(selection, { include: [], exclude: [] });
 });
 
-// --- colour filtering (subset semantics) --------------------------------
+check('cycleSelection leaves other values in the facet untouched', () => {
+  const selection: FilterSelection = { include: ['U'], exclude: ['B'] };
+  const next = cycleSelection(selection, 'W');
+  assert.deepStrictEqual(next, { include: ['U', 'W'], exclude: ['B'] });
+});
 
-check('colour filter keeps subsets of the selected colours, plus colorless', () => {
+check('hasActiveFilters is false only when every facet is empty', () => {
+  assert.strictEqual(hasActiveFilters(EMPTY_FILTERS), false);
+  assert.strictEqual(hasActiveFilters({ ...EMPTY_FILTERS, colors: { include: ['W'], exclude: [] } }), true);
+  assert.strictEqual(hasActiveFilters({ ...EMPTY_FILTERS, themes: { include: [], exclude: ['Tokens'] } }), true);
+  assert.strictEqual(
+    hasActiveFilters({ ...EMPTY_FILTERS, colorCategory: { include: ['colorless'], exclude: [] } }),
+    true
+  );
+});
+
+// --- colour filtering (subset-include, any-touch-exclude) --------------
+
+check('colour include keeps subsets of the selected colours, plus colorless', () => {
   const golgari = makeSuggestion({ colorIdentity: ['B', 'G'] });
   const monoBlack = makeSuggestion({ colorIdentity: ['B'] });
   const colorless = makeSuggestion({ colorIdentity: [] });
   const boros = makeSuggestion({ colorIdentity: ['W', 'R'] });
 
-  const filters = { ...EMPTY_FILTERS, colors: ['B', 'G'] };
+  const filters = { ...EMPTY_FILTERS, colors: { include: ['B', 'G'], exclude: [] } };
   const kept = applyFilters([golgari, monoBlack, colorless, boros], filters);
   assert.deepStrictEqual(kept, [golgari, monoBlack, colorless]);
 });
 
-check('colorCategory narrows to colorless or multicolor independently of colors', () => {
-  const mono = makeSuggestion({ colorIdentity: ['B'] });
-  const colorless = makeSuggestion({ colorIdentity: [] });
-  const twoColor = makeSuggestion({ colorIdentity: ['B', 'G'] });
+check('colour exclude drops anything touching an excluded colour', () => {
+  const golgari = makeSuggestion({ colorIdentity: ['B', 'G'] });
+  const mardu = makeSuggestion({ colorIdentity: ['W', 'B', 'R'] });
+  const simic = makeSuggestion({ colorIdentity: ['U', 'G'] });
 
-  const colorlessOnly = { ...EMPTY_FILTERS, colorCategory: 'colorless' as const };
-  assert.deepStrictEqual(applyFilters([mono, colorless, twoColor], colorlessOnly), [colorless]);
-
-  const multicolorOnly = { ...EMPTY_FILTERS, colorCategory: 'multicolor' as const };
-  assert.deepStrictEqual(applyFilters([mono, colorless, twoColor], multicolorOnly), [twoColor]);
+  const filters = { ...EMPTY_FILTERS, colors: { include: [], exclude: ['B'] } };
+  const kept = applyFilters([golgari, mardu, simic], filters);
+  assert.deepStrictEqual(kept, [simic]);
 });
 
-// --- theme filtering (AND, visible-only) --------------------------------
+// --- colour category (colorless / multicolor), same include/exclude cycle -
+
+check('colorCategory include=colorless keeps only zero-colour identities', () => {
+  const colorless = makeSuggestion({ colorIdentity: [] });
+  const mono = makeSuggestion({ colorIdentity: ['B'] });
+  const multi = makeSuggestion({ colorIdentity: ['B', 'G'] });
+
+  const filters = { ...EMPTY_FILTERS, colorCategory: { include: ['colorless'], exclude: [] } };
+  assert.deepStrictEqual(applyFilters([colorless, mono, multi], filters), [colorless]);
+});
+
+check('colorCategory include=multicolor keeps only 2+ colour identities', () => {
+  const colorless = makeSuggestion({ colorIdentity: [] });
+  const mono = makeSuggestion({ colorIdentity: ['B'] });
+  const multi = makeSuggestion({ colorIdentity: ['B', 'G'] });
+
+  const filters = { ...EMPTY_FILTERS, colorCategory: { include: ['multicolor'], exclude: [] } };
+  assert.deepStrictEqual(applyFilters([colorless, mono, multi], filters), [multi]);
+});
+
+check('colorCategory exclude=colorless drops zero-colour identities only', () => {
+  const colorless = makeSuggestion({ colorIdentity: [] });
+  const mono = makeSuggestion({ colorIdentity: ['B'] });
+  const multi = makeSuggestion({ colorIdentity: ['B', 'G'] });
+
+  const filters = { ...EMPTY_FILTERS, colorCategory: { include: [], exclude: ['colorless'] } };
+  assert.deepStrictEqual(applyFilters([colorless, mono, multi], filters), [mono, multi]);
+});
+
+check('colorCategory cycles the same off -> include -> exclude -> off as any other facet', () => {
+  let selection: FilterSelection = { include: [], exclude: [] };
+  assert.strictEqual(modeOf(selection, 'multicolor'), null);
+  selection = cycleSelection(selection, 'multicolor');
+  assert.strictEqual(modeOf(selection, 'multicolor'), 'include');
+  selection = cycleSelection(selection, 'multicolor');
+  assert.strictEqual(modeOf(selection, 'multicolor'), 'exclude');
+});
+
+// --- theme filtering (AND include, OR exclude, visible-only) -----------
 
 const sac = { key: 'sacrifice', label: 'Sacrifice', description: '', cards: [makeSupportingCard({ name: 'A' })] };
 const tokens = { key: 'tokens', label: 'Tokens', description: '', cards: [makeSupportingCard({ name: 'B' })] };
 const emptyTheme = { key: 'graveyard', label: 'Graveyard', description: '', cards: [] };
 
-check('theme filter requires every selected theme to be present', () => {
+check('theme include requires every selected theme to be present', () => {
   const both = makeSuggestion({ themeSupport: [sac, tokens] });
   const sacOnly = makeSuggestion({ themeSupport: [sac] });
 
-  const filters = { ...EMPTY_FILTERS, themes: ['Sacrifice', 'Tokens'] };
+  const filters = { ...EMPTY_FILTERS, themes: { include: ['Sacrifice', 'Tokens'], exclude: [] } };
   assert.deepStrictEqual(applyFilters([both, sacOnly], filters), [both]);
+});
+
+check('theme exclude drops a suggestion that has any excluded theme', () => {
+  const withSac = makeSuggestion({ themeSupport: [sac] });
+  const withTokens = makeSuggestion({ themeSupport: [tokens] });
+
+  const filters = { ...EMPTY_FILTERS, themes: { include: [], exclude: ['Sacrifice'] } };
+  assert.deepStrictEqual(applyFilters([withSac, withTokens], filters), [withTokens]);
 });
 
 check('theme filtering only sees themes that still have supporting cards', () => {
@@ -71,18 +148,24 @@ check('theme filtering only sees themes that still have supporting cards', () =>
   // filtering — it should behave as if this suggestion doesn't have it.
   const suggestion = makeSuggestion({ themeSupport: [sac, emptyTheme] });
 
-  const filters = { ...EMPTY_FILTERS, themes: ['Graveyard'] };
-  assert.deepStrictEqual(applyFilters([suggestion], filters), []);
+  const includeGraveyard = { ...EMPTY_FILTERS, themes: { include: ['Graveyard'], exclude: [] } };
+  assert.deepStrictEqual(applyFilters([suggestion], includeGraveyard), []);
+
+  const excludeGraveyard = { ...EMPTY_FILTERS, themes: { include: [], exclude: ['Graveyard'] } };
+  assert.deepStrictEqual(applyFilters([suggestion], excludeGraveyard), [suggestion]);
 });
 
 // --- bracket filtering ---------------------------------------------------
 
-check('bracket filter matches on the bracket range', () => {
+check('bracket include/exclude match on the bracket range', () => {
   const b1 = makeSuggestion({ bracket: { label: '', range: 'Bracket 1–2', note: '' } });
   const b3 = makeSuggestion({ bracket: { label: '', range: 'Bracket 3', note: '' } });
 
-  const filters = { ...EMPTY_FILTERS, brackets: ['Bracket 3'] };
-  assert.deepStrictEqual(applyFilters([b1, b3], filters), [b3]);
+  const include = { ...EMPTY_FILTERS, brackets: { include: ['Bracket 3'], exclude: [] } };
+  assert.deepStrictEqual(applyFilters([b1, b3], include), [b3]);
+
+  const exclude = { ...EMPTY_FILTERS, brackets: { include: [], exclude: ['Bracket 3'] } };
+  assert.deepStrictEqual(applyFilters([b1, b3], exclude), [b1]);
 });
 
 // --- available filter values ---------------------------------------------

@@ -380,9 +380,18 @@ body {
   opacity: 0.8;
 }
 
-.toggle-pip[data-state='on'] {
+/* Include/exclude read as colour, not just a filled-in state, since both
+   are "active" — green ring to require a value, red ring to rule it out. */
+.toggle-pip-include {
   opacity: 1;
-  border-color: var(--brass-bright);
+  border-color: #2e8c50;
+  box-shadow: 0 0 0 1px #2e8c50;
+}
+
+.toggle-pip-exclude {
+  opacity: 1;
+  border-color: var(--pip-r);
+  box-shadow: 0 0 0 1px var(--pip-r);
 }
 
 .toggle-chip {
@@ -405,10 +414,21 @@ body {
   color: var(--text-primary);
 }
 
-.toggle-chip[data-state='on'] {
-  background: rgba(184, 132, 42, 0.2);
-  border-color: var(--brass-bright);
-  color: var(--text-primary);
+.toggle-chip-include {
+  background: rgba(46, 140, 80, 0.18);
+  border-color: #2e8c50;
+  color: #dff5e5;
+}
+
+.toggle-chip-exclude {
+  background: rgba(198, 54, 42, 0.18);
+  border-color: var(--pip-r);
+  color: #ffd9d4;
+}
+
+.chip-mode-icon {
+  font-weight: 700;
+  line-height: 1;
 }
 
 .sort-control {
@@ -793,6 +813,57 @@ body {
 .badge-gc {
   background: rgba(198, 54, 42, 0.15);
   color: var(--pip-r);
+}
+
+/* Relative match-strength badge + its hover/tap tooltip. Positioned so the
+   tooltip can float above the card without pushing other badges around. */
+.match-badge-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.badge-match {
+  font: inherit;
+  border: none;
+  cursor: pointer;
+  background: rgba(15, 106, 181, 0.15);
+  color: #0f5c9c;
+  transition: background 0.15s ease;
+}
+
+.badge-match:hover,
+.badge-match:focus-visible {
+  background: rgba(15, 106, 181, 0.25);
+}
+
+.match-tooltip {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  width: 15rem;
+  max-width: 60vw;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-primary);
+  background: var(--ink-raised);
+  border: 1px solid var(--ink-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.match-badge-wrap:hover .match-tooltip,
+.match-badge-wrap:focus-within .match-tooltip,
+.match-badge-wrap.is-open .match-tooltip {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .commander-meta {
