@@ -85,6 +85,9 @@ export function RecommendationResults() {
   const filtered = useMemo(() => applyFilters(kept, filters), [kept, filters]);
   const sorted = useMemo(() => sortSuggestions(filtered, sortMode), [filtered, sortMode]);
   const { brackets, themes, hasColorless, hasMulticolor } = useMemo(() => availableFilterValues(kept), [kept]);
+  // The match badge's percentage is relative to the best score currently on
+  // screen, not sort order — so it stays meaningful under either sort mode.
+  const maxScore = useMemo(() => Math.max(0, ...filtered.map((s) => s.score)), [filtered]);
 
   // TanStack Table is used headlessly here, purely for the pagination state
   // machine — page bounds, and resetting to page 1 when filtering or sorting
@@ -179,7 +182,7 @@ export function RecommendationResults() {
             <>
               <div className="suggestion-grid">
                 {rows.map((row) => (
-                  <CommanderCard key={row.original.unitId} suggestion={row.original} />
+                  <CommanderCard key={row.original.unitId} suggestion={row.original} maxScore={maxScore} />
                 ))}
               </div>
 

@@ -37,6 +37,56 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
   );
 }
 
+/**
+ * How strongly this suggestion scored relative to the best match in the
+ * current (filtered) results — not an absolute number, which the scoring
+ * formula gives no natural ceiling for and so wouldn't mean anything on its
+ * own. Shown as a badge; hovering (or tapping, for touch) reveals a
+ * breakdown of what drove it.
+ *
+ * The tooltip stays in the DOM and is shown/hidden with CSS (:hover,
+ * :focus-within) so desktop hover needs no JS at all — `open` only exists to
+ * make tap-to-toggle work on touch devices, which have no hover state.
+ */
+function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionDTO; maxScore: number }) {
+  const [open, setOpen] = useState(false);
+  const tooltipId = useId();
+  const percent = maxScore > 0 ? Math.round((suggestion.score / maxScore) * 100) : 100;
+
+  const signals: string[] = [];
+  if (suggestion.matchedCreatureTypes.length > 0) {
+    signals.push(`${suggestion.matchedCreatureTypes.length} tribal`);
+  }
+  if (suggestion.matchedThemes.length > 0) {
+    signals.push(`${suggestion.matchedThemes.length} theme${suggestion.matchedThemes.length === 1 ? '' : 's'}`);
+  }
+  if (suggestion.matchedKeywords.length > 0) {
+    signals.push(`${suggestion.matchedKeywords.length} keyword${suggestion.matchedKeywords.length === 1 ? '' : 's'}`);
+  }
+
+  return (
+    <span className={`match-badge-wrap${open ? ' is-open' : ''}`}>
+      <button
+        type="button"
+        className="badge badge-match"
+        aria-describedby={tooltipId}
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+      >
+        {percent}% match
+      </button>
+      <span role="tooltip" id={tooltipId} className="match-tooltip">
+        {percent < 100
+          ? `${percent}% as strong a match as the top suggestion here, `
+          : 'The strongest match in your current results, '}
+        based on {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} from your list
+        fitting its colours
+        {signals.length > 0 ? `, plus ${signals.join(', ')} signal${signals.length === 1 ? '' : 's'}` : ''}.
+      </span>
+    </span>
+  );
+}
+
 /** One face's own art, opening a whole-card image preview when tapped. */
 function CommanderArt({ card }: { card: CommanderCardDTO }) {
   if (!card.imageUri) return null;
@@ -98,7 +148,15 @@ function CommanderFace({ card, bracket }: { card: CommanderCardDTO; bracket: Bra
   );
 }
 
-export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
+export function CommanderCard({
+  suggestion,
+  maxScore,
+}: {
+  suggestion: CommanderSuggestionDTO;
+  /** The highest score among the currently-visible suggestions, for the
+   * match badge's relative percentage. */
+  maxScore: number;
+}) {
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const dismiss = useAppStore((s) => s.dismiss);
@@ -160,6 +218,7 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
         ))}
 
         <div className="badge-row">
+          <MatchBadge suggestion={suggestion} maxScore={maxScore} />
           <span className="badge badge-bracket">{suggestion.bracket.range}</span>
           {isGameChanger && <span className="badge badge-gc">Game Changer</span>}
         </div>
