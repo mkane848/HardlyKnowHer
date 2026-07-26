@@ -9,6 +9,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-07-26
+
 ### Added
 
 - Partner, Partner—[text], Partner with [Name], Friends forever, Choose a
@@ -77,5 +79,6 @@ stands today, not a chronological history of how it got here.
   official Bracket System — they don't model combo speed, mass land
   destruction, or extra-turn density.
 
-[Unreleased]: https://github.com/mkane848/HardlyKnowHer/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/mkane848/HardlyKnowHer/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/mkane848/HardlyKnowHer/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/mkane848/HardlyKnowHer/releases/tag/v1.0.0
