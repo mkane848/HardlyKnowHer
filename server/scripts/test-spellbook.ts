@@ -118,7 +118,7 @@ async function main() {
 
     await findCombos(['Grimgrin, Corpse-Born'], ['Gravecrawler']);
     const sent = state.requests[0];
-    assert.match(sent.userAgent ?? '', /MtgCommanderRecommender/);
+    assert.match(sent.userAgent ?? '', /CommanderIHardlyKnowEr/);
     assert.deepStrictEqual(sent.body, {
       commanders: [{ card: 'Grimgrin, Corpse-Born' }],
       main: [{ card: 'Gravecrawler' }],

@@ -28,6 +28,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   filter bar's theme chips) now only count a theme or tribe if it still
   has supporting cards after narrowing to that commander's colour
   identity, rather than showing one with nothing behind it.
+- Layout now keeps clear of notches, the home indicator, and a sliding
+  mobile URL bar on phones.
 
 ## [1.0.0] — 2026-07-26
 

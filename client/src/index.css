@@ -380,18 +380,9 @@ body {
   opacity: 0.8;
 }
 
-/* Include/exclude read as colour, not just a filled-in state, since both
-   are "active" — green ring to require a value, red ring to rule it out. */
-.toggle-pip-include {
+.toggle-pip[data-state='on'] {
   opacity: 1;
-  border-color: #2e8c50;
-  box-shadow: 0 0 0 1px #2e8c50;
-}
-
-.toggle-pip-exclude {
-  opacity: 1;
-  border-color: var(--pip-r);
-  box-shadow: 0 0 0 1px var(--pip-r);
+  border-color: var(--brass-bright);
 }
 
 .toggle-chip {
@@ -414,21 +405,10 @@ body {
   color: var(--text-primary);
 }
 
-.toggle-chip-include {
-  background: rgba(46, 140, 80, 0.18);
-  border-color: #2e8c50;
-  color: #dff5e5;
-}
-
-.toggle-chip-exclude {
-  background: rgba(198, 54, 42, 0.18);
-  border-color: var(--pip-r);
-  color: #ffd9d4;
-}
-
-.chip-mode-icon {
-  font-weight: 700;
-  line-height: 1;
+.toggle-chip[data-state='on'] {
+  background: rgba(184, 132, 42, 0.2);
+  border-color: var(--brass-bright);
+  color: var(--text-primary);
 }
 
 .sort-control {
@@ -813,87 +793,6 @@ body {
 .badge-gc {
   background: rgba(198, 54, 42, 0.15);
   color: var(--pip-r);
-}
-
-.badge-pairing {
-  background: rgba(15, 106, 181, 0.15);
-  color: #0f5c9c;
-}
-
-/* Second-commander options */
-
-.partner-list {
-  list-style: none;
-  margin: 0.15rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--parchment-dim);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.partner-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  padding: 0.45rem 0.65rem;
-  background: rgba(36, 31, 22, 0.04);
-}
-
-.partner-item + .partner-item {
-  border-top: 1px solid var(--parchment-dim);
-}
-
-.partner-name {
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: inherit;
-  text-align: left;
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-}
-
-.partner-name:hover,
-.partner-name:focus-visible {
-  text-decoration: underline;
-  color: #7a5615;
-}
-
-.partner-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-left: auto;
-}
-
-.partner-pips {
-  display: inline-flex;
-  gap: 0.12rem;
-  font-size: 0.85rem;
-}
-
-.partner-identity {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-text-muted);
-}
-
-.partner-gain {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 600;
-  color: #1f7a45;
-  background: rgba(31, 122, 69, 0.12);
-  border-radius: 999px;
-  padding: 0.1rem 0.4rem;
 }
 
 .commander-meta {
