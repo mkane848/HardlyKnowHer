@@ -90,11 +90,10 @@ cd client && npm test
 Both are dependency-free (`node:assert` + [`tsx`](https://github.com/privatenumber/tsx),
 no test framework) and run in a few seconds. See each `scripts/test-*.ts`
 file for what's covered — deck-list parsing, Commander Spellbook response
-normalisation, and Bracket estimation on the server; colour ordering, the
-"still has supporting cards" display filter, filter-bar matching, and sort
-ordering on the client. `partners.ts` and `synergy.ts` (Partner/Background
-pairing and the scoring engine) have no automated coverage yet — see
-`handoff.md` if you're touching either.
+normalisation, Bracket estimation, Partner/Background pairing, and the
+scoring engine (including the union-across-a-pair semantics) on the server;
+colour ordering, the "still has supporting cards" display filter, filter-bar
+matching, and sort ordering on the client.
 
 ## Card list format
 
@@ -248,8 +247,13 @@ See [`DEPLOY.md`](./DEPLOY.md) for a free, one-click Render setup (the repo's
 
 ## Contributing
 
-This started as a solo hobby project, so there's no formal contribution
-process yet — issues and pull requests are still welcome. `handoff.md` has
-the fuller design rationale and known risk areas if you're picking up
-unfamiliar parts of the codebase. `CHANGELOG.md` tracks notable changes;
-please add an entry under `[Unreleased]` alongside any user-facing change.
+This started as a solo hobby project — issues and pull requests are
+welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for dev setup and
+conventions, and [`handoff.md`](./handoff.md) for the fuller design
+rationale and known risk areas if you're picking up unfamiliar parts of the
+codebase. `CHANGELOG.md` tracks notable changes; please add an entry under
+`[Unreleased]` alongside any user-facing change.
+
+## License
+
+[MIT](./LICENSE)

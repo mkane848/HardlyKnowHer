@@ -214,13 +214,10 @@ server/                Express + TS + better-sqlite3
     test-parse-list.ts        npm test — parser cases (node:assert via tsx)
     test-spellbook.ts          npm test — Spellbook adapter cases, against a local mock
     test-bracket.ts             npm test — Bracket-estimate cases
+    test-partners.ts             npm test — every pairing variant + negative cases (rule 702.124)
+    test-synergy.ts               npm test — profiling + scoring, incl. union-across-a-pair semantics
   data/                     gitignored; oracle-cards.json + cards.sqlite live here
 ```
-
-`partners.ts`/`synergy.ts` have no automated test coverage yet (see the
-"Merged with main's independent Partner/Background work" section below for
-why — main's equivalent tests covered its own, discarded API and couldn't
-be ported). Worth writing before either file changes again.
 
 ## Core logic, summarized (read the files for full detail)
 
@@ -483,9 +480,10 @@ which was carried forward on top of the kept design:
   include/exclude `FilterSelection` model — see below). **Deleted**:
   `test-partners.ts`, `test-synergy.ts` — these tested main's discarded
   `detectPairing`/`canPair`/`buildPartnerOptions` API, which no longer
-  exists. This branch's `partners.ts`/`synergy.ts` still have no automated
-  test coverage of their own (only the hand-fixture verification noted
-  above) — worth writing if this file changes again.
+  exists. (This branch's own `partners.ts`/`synergy.ts` gained real test
+  coverage in a later round — `server/scripts/test-partners.ts` and
+  `test-synergy.ts` — written against this branch's actual API, not a port
+  of main's.)
 
 **Deliberately not adopted**: main also rewrote the filter bar from a
 multi-select "must include" model to a three-state include/exclude-per-value
