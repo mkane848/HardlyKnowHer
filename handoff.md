@@ -292,14 +292,28 @@ server/                Express + TS + better-sqlite3
      would just duplicate the same detection twice.
   3. Scores every `CommanderUnit` from `partners.ts` (not a single `CardRow`
      — see above): requires nonzero color-identity overlap AND at least one
-     tribal/theme/keyword/archetype signal (signal threshold: appears ≥2
-     times in the list) to even be considered. Every signal is unioned
-     across both cards in a pair (`unitColorIdentity`/`unitCreatureTypes`/
-     `unitKeywords`/`unitOracleText`) per rule 702.124e — a Partner pair
-     matches anything either half of it would match solo, and its combined
-     color identity is the union, not the intersection. Score =
-     `coverageRatio * 50 + tribalMatches * 15 + themeMatches * 10 +
-     keywordMatches * 8 + archetypeMatches * 20`.
+     tribal/theme/keyword/archetype signal to even be considered. A signal
+     counts only if at least `MIN_SIGNAL_COUNT` (3) *distinct* cards back it
+     **after** narrowing to that unit's colour identity. Every signal is
+     unioned across both cards in a pair (`unitColorIdentity`/
+     `unitCreatureTypes`/`unitKeywords`/`unitOracleText`) per rule 702.124e
+     — a Partner pair matches anything either half of it would match solo,
+     and its combined color identity is the union, not the intersection.
+
+     Each signal then scores its **density**: the share of the unit's
+     castable pool (distinct cards fitting its identity) that backs it,
+     times a per-kind weight — `tribal * 15 + theme * 10 + keyword * 8 +
+     archetype * 20`. So a signal every playable card supports is worth its
+     full weight; one that half of them support is worth half.
+
+     Colour identity decides *which cards are eligible* and contributes
+     nothing to the score. It used to: an earlier formula opened with
+     `coverageRatio * 50`, the largest term, which a five-colour commander
+     banked in full for free — it could out-rank a mono-colour commander
+     that matched the list twice as well, before synergy was even weighed.
+     Reach is what lets a commander play your cards; it is not a reason to
+     prefer one. See the two "scoring measures focus" cases in
+     `test-synergy.ts`, which pin this down.
   - Partner-family keywords (Partner, Partner with, Friends forever, Choose
     a Background, Doctor's companion) are excluded from the shared-keyword
     signal on purpose — they mean something structural about who can be

@@ -90,7 +90,10 @@ router.post('/recommend', (req, res) => {
         isGameChanger: !!c.game_changer,
       })),
       colorIdentity,
-      score: Math.round(s.score),
+      // One decimal, not whole numbers: density-based scores are small, so
+      // rounding to an integer would collapse genuinely different matches
+      // onto the same value and flatten the match badge's percentages.
+      score: Math.round(s.score * 10) / 10,
       matchedThemes: s.matchedThemes,
       matchedCreatureTypes: s.matchedCreatureTypes,
       matchedKeywords: s.matchedKeywords,

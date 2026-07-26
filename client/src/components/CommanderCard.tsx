@@ -75,13 +75,17 @@ function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionD
       >
         {percent}% match
       </button>
+      {/* The card count is the pool each signal is measured against, not
+          credit in its own right — colours decide what is eligible and score
+          nothing, so the wording must not imply that playing more of your
+          list is itself what earned the score. */}
       <span role="tooltip" id={tooltipId} className="match-tooltip">
         {percent < 100
-          ? `${percent}% as strong a match as the top suggestion here, `
-          : 'The strongest match in your current results, '}
-        based on {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} from your list
-        fitting its colours
-        {signals.length > 0 ? `, plus ${signals.join(', ')} signal${signals.length === 1 ? '' : 's'}` : ''}.
+          ? `${percent}% as strong a match as the top suggestion here`
+          : 'The strongest match in your current results'}
+        {signals.length > 0 ? `: ${signals.join(', ')} signal${signals.length === 1 ? '' : 's'}` : ''}, weighed against
+        the {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} it can play from your
+        list. Colours decide which cards count, never how good the match is.
       </span>
     </span>
   );

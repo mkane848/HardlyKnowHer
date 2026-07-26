@@ -9,6 +9,21 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Changed
+
+- Colour identity no longer scores anything by itself. It used to open the
+  formula with `coverageRatio * 50` — the largest single term — which a
+  five-colour commander banked in full for free, so it could out-rank a
+  mono-colour commander that matched your list twice as well before any
+  synergy was weighed. Identity now only decides which cards are eligible
+  to count.
+- Signals are scored by density instead of a flat count: each tribe, theme,
+  keyword, and archetype is worth the share of that commander's playable
+  cards standing behind it. A signal every playable card supports is worth
+  its full weight; one that half of them support is worth half. Scoring
+  now rewards a focused fit rather than colour reach, and a deep theme no
+  longer counts the same as one scraping the three-card minimum.
+
 ## [1.2.0] — 2026-07-26
 
 ### Changed
