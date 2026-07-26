@@ -386,6 +386,27 @@ data from Scryfall on every deploy rather than using a persistent disk. See
 `DEPLOY.md` for the walkthrough and "Known risk areas" above for the
 specific failure modes that have bitten a deploy before.
 
+## Releasing (tagging + GitHub Releases)
+
+Cutting a release is still a deliberate, manual decision — bump the version
+in all three `package.json` files (root, `server/`, `client/`), move
+`CHANGELOG.md`'s `[Unreleased]` entries under a new `## [x.y.z] — date`
+heading, and get that merged to `main`. What's automated is only the
+mechanical last step: `.github/workflows/release.yml` runs on every push to
+`main` and checks whether the root `package.json`'s version already has a
+matching `vX.Y.Z` git tag. If not, it extracts that version's section from
+`CHANGELOG.md` and creates the tag + a GitHub Release from it, via `gh
+release create` using the workflow's own `GITHUB_TOKEN` — not this
+session's git credentials, which are sandboxed and cannot push tags
+directly (`git push origin <tag>` gets a 403 from the local git proxy; this
+is why the workflow exists instead of a plain `git tag && git push`).
+
+Ordinary PRs that don't touch the version are a no-op here — nothing
+releases unless someone deliberately bumped `package.json`. This preserves
+the "batch several PRs into one release if you want" flexibility discussed
+when this was set up, while still turning "merge the version-bump commit"
+into "the release exists," with no separate manual tagging step.
+
 ## Explicit non-goals for v1 (don't scope-creep these back in without asking)
 
 - No user accounts, saved lists, or deck history
