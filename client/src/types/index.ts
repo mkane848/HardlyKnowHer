@@ -24,6 +24,11 @@ export interface TribeSupportDTO {
   cards: SupportingCardDTO[];
 }
 
+export interface KeywordSupportDTO {
+  keyword: string;
+  cards: SupportingCardDTO[];
+}
+
 export interface CommanderSuggestionDTO {
   oracleId: string;
   name: string;
@@ -38,9 +43,11 @@ export interface CommanderSuggestionDTO {
   score: number;
   matchedThemes: string[];
   matchedCreatureTypes: string[];
+  matchedKeywords: string[];
   includedCardCount: number;
   themeSupport: ThemeSupportDTO[];
   tribeSupport: TribeSupportDTO[];
+  keywordSupport: KeywordSupportDTO[];
   gameChangerCards: SupportingCardDTO[];
   gameChangerCount: number;
   isGameChanger: boolean;

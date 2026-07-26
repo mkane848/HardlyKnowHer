@@ -56,6 +56,7 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
   const hasReasons =
     suggestion.themeSupport.length > 0 ||
     suggestion.tribeSupport.length > 0 ||
+    suggestion.keywordSupport.length > 0 ||
     suggestion.gameChangerCards.length > 0;
 
   return (
@@ -124,6 +125,11 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
             <span className="commander-tags-label">Themes</span> {suggestion.matchedThemes.join(', ')}
           </p>
         )}
+        {suggestion.matchedKeywords.length > 0 && (
+          <p className="commander-tags">
+            <span className="commander-tags-label">Keywords</span> {suggestion.matchedKeywords.join(', ')}
+          </p>
+        )}
 
         <p className="commander-bracket-note">{suggestion.bracket.note}</p>
 
@@ -178,6 +184,24 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
               </section>
             )}
 
+            {suggestion.keywordSupport.length > 0 && (
+              <section className="explain-section">
+                <h4 className="explain-heading">Shared keywords</h4>
+                {suggestion.keywordSupport.map((kw) => (
+                  <div key={kw.keyword} className="explain-group">
+                    <p className="explain-group-title">
+                      {kw.keyword} <span className="explain-count">{cardCount(kw.cards)} in your list</span>
+                    </p>
+                    <p className="explain-group-desc">
+                      This commander has {kw.keyword}, and enough of your list does too for it to be a real pattern,
+                      not a coincidence.
+                    </p>
+                    <SupportingCardList cards={kw.cards} />
+                  </div>
+                ))}
+              </section>
+            )}
+
             {suggestion.gameChangerCards.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Driving the Bracket estimate</h4>
@@ -191,8 +215,8 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
             <ComboFinder commanderName={suggestion.name} />
 
             <p className="explain-caveat">
-              Matches come from card text and creature types, not a model of how the deck actually plays.
-              Treat this as a starting point.
+              Matches come from card text, keywords, and creature types, not a model of how the deck actually
+              plays. Treat this as a starting point.
             </p>
           </div>
         )}
