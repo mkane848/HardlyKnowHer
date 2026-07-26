@@ -62,6 +62,15 @@ function solo(card: CardRow): CommanderUnit {
   return { cards: [card] };
 }
 
+/** N distinct sacrifice-themed cards — the signal threshold counts distinct
+ * citable cards, not summed quantity, so "enough signal" means enough
+ * different cards, not enough copies of one. */
+function sacrificeCards(n: number, overrides: Partial<CardRow> = {}): CardRow[] {
+  return Array.from({ length: n }, (_, i) =>
+    makeCard({ name: `Sac ${i}`, oracle_text: 'Sacrifice a creature: draw a card.', ...overrides })
+  );
+}
+
 // --- buildCollectionProfile ------------------------------------------------
 
 check('buildCollectionProfile counts colors, weighted by quantity', () => {
@@ -95,14 +104,15 @@ check('buildCollectionProfile detects themes from oracle text', () => {
 // --- scoreCommanders: identity + signal gating -----------------------------
 
 check('a candidate with zero colour-identity overlap is not suggested', () => {
-  const ownedCard = makeCard({ color_identity: JSON.stringify(['W']) });
+  const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['W']) });
   const candidate = makeCard({
     name: 'Candidate',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature.',
   });
-  const profile = buildCollectionProfile([owned(ownedCard, 2)]);
-  const suggestions = scoreCommanders([solo(candidate)], profile, [owned(ownedCard, 2)]);
+  const ownedEntries = ownedCards.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 0);
 });
 
@@ -118,48 +128,107 @@ check('a candidate that fits identity but shares no signal is not suggested', ()
   assert.strictEqual(suggestions.length, 0);
 });
 
-check('a signal below the minimum count threshold does not trigger a suggestion', () => {
-  // Only one copy of a sacrifice card in the list — below MIN_SIGNAL_COUNT (2).
+check('a signal below the minimum card-count threshold does not trigger a suggestion', () => {
+  // Two distinct sacrifice cards — below MIN_SIGNAL_COUNT (3 distinct cards).
+  const ownedCards = sacrificeCards(2, { color_identity: JSON.stringify(['B']) });
+  const candidate = makeCard({
+    name: 'Candidate',
+    color_identity: JSON.stringify(['B']),
+    oracle_text: 'Sacrifice a creature: draw a card.',
+  });
+  const ownedEntries = ownedCards.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
+  assert.strictEqual(suggestions.length, 0);
+});
+
+check('summed quantity of one card is not enough — the threshold counts distinct cards', () => {
+  // A single card owned in bulk should not, by itself, clear a threshold
+  // meant to measure how many different cards support a theme.
   const sacCard = makeCard({ color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
   const candidate = makeCard({
     name: 'Candidate',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature: draw a card.',
   });
-  const profile = buildCollectionProfile([owned(sacCard, 1)]);
-  const suggestions = scoreCommanders([solo(candidate)], profile, [owned(sacCard, 1)]);
+  const profile = buildCollectionProfile([owned(sacCard, 10)]);
+  const suggestions = scoreCommanders([solo(candidate)], profile, [owned(sacCard, 10)]);
   assert.strictEqual(suggestions.length, 0);
 });
 
 check('a candidate is suggested once colour identity fits and a signal clears the threshold', () => {
-  const sacCard = makeCard({ color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
+  const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
   const candidate = makeCard({
     name: 'Candidate',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature: draw a card.',
   });
-  const profile = buildCollectionProfile([owned(sacCard, 2)]);
-  const suggestions = scoreCommanders([solo(candidate)], profile, [owned(sacCard, 2)]);
+  const ownedEntries = ownedCards.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 1);
   assert.strictEqual(suggestions[0].matchedThemes.includes('Sacrifice'), true);
+  assert.strictEqual(suggestions[0].themeSupport[0].cards.length, 3);
 });
 
-check('a matched theme still requires the candidate\'s own text to show the same signal', () => {
+check('a weak signal is stripped from a suggestion that survives on a strong one', () => {
+  // The case that motivated the threshold: a commander that is both a Human
+  // and a Wizard, against a list with 16 Humans but only 2 Wizards. The
+  // suggestion itself is legitimate — Human clears the threshold — but the
+  // Wizard group must not appear in the explanation *or* contribute to the
+  // score. A two-card group is noise, and scoring on it would rank this
+  // commander above one whose signals are all real.
+  const wizards = [
+    makeCard({ name: 'Viscera Seer', color_identity: JSON.stringify(['B']), creature_types: JSON.stringify(['Wizard']) }),
+    makeCard({ name: 'Vizkopa Guildmage', color_identity: JSON.stringify(['B']), creature_types: JSON.stringify(['Wizard']) }),
+  ];
+  const humans = Array.from({ length: 16 }, (_, i) =>
+    makeCard({ name: `Human ${i}`, color_identity: JSON.stringify(['B']), creature_types: JSON.stringify(['Human']) })
+  );
+  const candidate = makeCard({
+    name: 'Candidate',
+    color_identity: JSON.stringify(['B']),
+    creature_types: JSON.stringify(['Human', 'Wizard']),
+  });
+
+  const ownedEntries = [...wizards, ...humans].map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
+
+  assert.strictEqual(suggestions.length, 1);
+  // Shown to the user: Human only, no empty-ish Wizard group.
+  assert.deepStrictEqual(
+    suggestions[0].tribeSupport.map((t) => t.type),
+    ['Human']
+  );
+  // Counted by the engine: likewise Human only.
+  assert.deepStrictEqual(suggestions[0].matchedCreatureTypes, ['Human']);
+  // And the score reflects one tribal signal, not two.
+  const coverage = (18 / 18) * 50;
+  assert.strictEqual(suggestions[0].score, coverage + 15);
+});
+
+check("a matched theme still requires the candidate's own text to show the same signal", () => {
   // The list is sacrifice-heavy, but the candidate itself never mentions it —
   // a global match on the profile alone should not be enough.
-  const sacCard = makeCard({ color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
+  const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
   const candidate = makeCard({
     name: 'Candidate',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'This card does something else entirely.',
   });
-  const profile = buildCollectionProfile([owned(sacCard, 2)]);
-  const suggestions = scoreCommanders([solo(candidate)], profile, [owned(sacCard, 2)]);
+  const ownedEntries = ownedCards.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 0);
 });
 
-check('only cards that fit the candidate\'s colour identity count toward includedCardCount', () => {
-  const fits = makeCard({ name: 'Fits', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
+check('a theme with enough global matches but too few after identity-narrowing is dropped entirely', () => {
+  // Three sacrifice cards match globally, but only two of them are actually
+  // playable under this candidate's colour identity — below the threshold
+  // once narrowed, so this should affect scoring, not just display.
+  const fitsA = makeCard({ name: 'Fits A', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
+  const fitsB = makeCard({ name: 'Fits B', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
   const doesNotFit = makeCard({
     name: 'Does Not Fit',
     color_identity: JSON.stringify(['W']),
@@ -170,45 +239,67 @@ check('only cards that fit the candidate\'s colour identity count toward include
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature: draw a card.',
   });
-  const profile = buildCollectionProfile([owned(fits, 2), owned(doesNotFit, 5)]);
-  const suggestions = scoreCommanders([solo(candidate)], profile, [owned(fits, 2), owned(doesNotFit, 5)]);
+  const ownedEntries = [owned(fitsA), owned(fitsB), owned(doesNotFit)];
+  const profile = buildCollectionProfile(ownedEntries);
+  // Globally, sacrifice has 3 matches — clears the raw MIN_SIGNAL_COUNT.
+  assert.strictEqual(profile.themeCounts['sacrifice'], 3);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
+  // But only 2 of those 3 fit this candidate's identity, so it must not count.
+  assert.strictEqual(suggestions.length, 0);
+});
+
+check("only cards that fit the candidate's colour identity count toward includedCardCount", () => {
+  const fits = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
+  const doesNotFit = makeCard({
+    name: 'Does Not Fit',
+    color_identity: JSON.stringify(['W']),
+    oracle_text: 'Sacrifice a creature.',
+  });
+  const candidate = makeCard({
+    name: 'Candidate',
+    color_identity: JSON.stringify(['B']),
+    oracle_text: 'Sacrifice a creature: draw a card.',
+  });
+  const ownedEntries = [...fits.map((c) => owned(c)), owned(doesNotFit, 5)];
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 1);
-  assert.strictEqual(suggestions[0].includedCardCount, 2);
+  assert.strictEqual(suggestions[0].includedCardCount, 3);
 });
 
 // --- archetypes --------------------------------------------------------
 
 check('Aristocrats requires at least 2 of its 3 component themes', () => {
-  const sac = makeCard({ name: 'Sac', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
-  const dies = makeCard({
-    name: 'Dies',
-    color_identity: JSON.stringify(['B']),
-    oracle_text: 'Whenever a creature you control dies, drain 1 life.',
-  });
+  const sac = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
+  const dies = Array.from({ length: 3 }, (_, i) =>
+    makeCard({
+      name: `Dies ${i}`,
+      color_identity: JSON.stringify(['B']),
+      oracle_text: 'Whenever a creature you control dies, drain 1 life.',
+    })
+  );
   const candidate = makeCard({
     name: 'Aristocrats Commander',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature. Whenever a creature you control dies, draw a card.',
   });
-  const profile = buildCollectionProfile([owned(sac, 2), owned(dies, 2)]);
-  const suggestions = scoreCommanders(
-    [solo(candidate)],
-    profile,
-    [owned(sac, 2), owned(dies, 2)]
-  );
+  const ownedEntries = [...sac, ...dies].map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 1);
   assert.ok(suggestions[0].matchedThemes.includes('Aristocrats'));
 });
 
 check('a single matching component theme is not enough for Aristocrats', () => {
-  const sac = makeCard({ name: 'Sac', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
+  const sac = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
   const candidate = makeCard({
     name: 'Just Sacrifice',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature: draw a card.',
   });
-  const profile = buildCollectionProfile([owned(sac, 2)]);
-  const suggestions = scoreCommanders([solo(candidate)], profile, [owned(sac, 2)]);
+  const ownedEntries = sac.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(candidate)], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 1);
   assert.strictEqual(suggestions[0].matchedThemes.includes('Aristocrats'), false);
   assert.ok(suggestions[0].matchedThemes.includes('Sacrifice'));
@@ -217,7 +308,14 @@ check('a single matching component theme is not enough for Aristocrats', () => {
 // --- sorting -------------------------------------------------------------
 
 check('suggestions are sorted by score, highest first', () => {
-  const sac = makeCard({ name: 'Sac', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
+  const sac = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
+  const vampires = Array.from({ length: 3 }, (_, i) =>
+    makeCard({
+      name: `Vampire ${i}`,
+      color_identity: JSON.stringify(['B']),
+      creature_types: JSON.stringify(['Vampire']),
+    })
+  );
   const weak = makeCard({
     name: 'Weak',
     color_identity: JSON.stringify(['B']),
@@ -229,13 +327,9 @@ check('suggestions are sorted by score, highest first', () => {
     creature_types: JSON.stringify(['Vampire']),
     oracle_text: 'Sacrifice a creature: draw a card.',
   });
-  const vampire = makeCard({ name: 'Vampire', color_identity: JSON.stringify(['B']), creature_types: JSON.stringify(['Vampire']) });
-  const profile = buildCollectionProfile([owned(sac, 2), owned(vampire, 2)]);
-  const suggestions = scoreCommanders(
-    [solo(weak), solo(strong)],
-    profile,
-    [owned(sac, 2), owned(vampire, 2)]
-  );
+  const ownedEntries = [...sac, ...vampires].map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(weak), solo(strong)], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 2);
   assert.strictEqual(suggestions[0].cards[0].name, 'Strong');
   assert.ok(suggestions[0].score > suggestions[1].score);
@@ -244,60 +338,57 @@ check('suggestions are sorted by score, highest first', () => {
 // --- Partner-pair union semantics (702.124e) -------------------------------
 
 check("a pair's colour identity is the union of both cards, not either alone", () => {
-  const ownedCard = makeCard({
-    name: 'Owned',
-    color_identity: JSON.stringify(['U']),
-    oracle_text: 'Sacrifice a creature.',
-  });
+  const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['U']) });
   const partnerA = makeCard({ name: 'A', color_identity: JSON.stringify(['U']) });
   const partnerB = makeCard({
     name: 'B',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature: draw a card.',
   });
-  const profile = buildCollectionProfile([owned(ownedCard, 2)]);
-  const suggestions = scoreCommanders(
-    [{ cards: [partnerA, partnerB] }],
-    profile,
-    [owned(ownedCard, 2)]
-  );
-  // The owned card is mono-U; the pair's union identity (U+B) covers it even
-  // though partnerB alone (mono-B) would not.
+  const ownedEntries = ownedCards.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([{ cards: [partnerA, partnerB] }], profile, ownedEntries);
+  // The owned cards are mono-U; the pair's union identity (U+B) covers them
+  // even though partnerB alone (mono-B) would not.
   assert.strictEqual(suggestions.length, 1);
   assert.deepStrictEqual(suggestions[0].cards.map((c) => c.name).sort(), ['A', 'B']);
 });
 
 check("a pair matches a theme that only one half's own text shows", () => {
-  const sacCard = makeCard({ color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
+  const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
   const silent = makeCard({ name: 'Silent Half', color_identity: JSON.stringify(['B']), oracle_text: '' });
   const vocal = makeCard({
     name: 'Vocal Half',
     color_identity: JSON.stringify(['B']),
     oracle_text: 'Sacrifice a creature: draw a card.',
   });
-  const profile = buildCollectionProfile([owned(sacCard, 2)]);
-  const suggestions = scoreCommanders([{ cards: [silent, vocal] }], profile, [owned(sacCard, 2)]);
+  const ownedEntries = ownedCards.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([{ cards: [silent, vocal] }], profile, ownedEntries);
   assert.strictEqual(suggestions.length, 1);
   assert.ok(suggestions[0].matchedThemes.includes('Sacrifice'));
 });
 
-check("a pair matches a creature type that only one half has", () => {
-  const vampireOwned = makeCard({
-    name: 'Owned Vampire',
-    color_identity: JSON.stringify(['B']),
-    creature_types: JSON.stringify(['Vampire']),
-  });
+check('a pair matches a creature type that only one half has', () => {
+  const vampiresOwned = Array.from({ length: 3 }, (_, i) =>
+    makeCard({
+      name: `Owned Vampire ${i}`,
+      color_identity: JSON.stringify(['B']),
+      creature_types: JSON.stringify(['Vampire']),
+    })
+  );
   const nonVampireHalf = makeCard({ name: 'Non-Vampire Half', color_identity: JSON.stringify(['B']) });
   const vampireHalf = makeCard({
     name: 'Vampire Half',
     color_identity: JSON.stringify(['B']),
     creature_types: JSON.stringify(['Vampire']),
   });
-  const profile = buildCollectionProfile([owned(vampireOwned, 2)]);
+  const ownedEntries = vampiresOwned.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
   const suggestions = scoreCommanders(
     [{ cards: [nonVampireHalf, vampireHalf] }],
     profile,
-    [owned(vampireOwned, 2)]
+    ownedEntries
   );
   assert.strictEqual(suggestions.length, 1);
   assert.ok(suggestions[0].matchedCreatureTypes.includes('Vampire'));

@@ -342,7 +342,16 @@ function unitOracleText(unit: CommanderUnit): string {
   return unit.cards.map((c) => c.oracle_text ?? '').join('\n');
 }
 
-const MIN_SIGNAL_COUNT = 2; // require a theme/tribe/keyword to show up at least twice to count as a real signal
+// Require at least this many *citable* cards — i.e. after narrowing to this
+// specific commander's own colour identity, not the whole list's global
+// count — for a theme/tribe/keyword to count as a real signal. Checking the
+// narrowed count rather than the global one matters: a theme can show up
+// twice in the list overall but zero times among cards this commander could
+// actually run, which isn't a reason to suggest it. Below this threshold, a
+// signal is dropped from scoring entirely, not just hidden from the "why"
+// panel — a commander scored on a signal it can't actually cite would be
+// ranked on something the user can't verify.
+const MIN_SIGNAL_COUNT = 3;
 
 /**
  * Scores each candidate commander against the collection profile.
@@ -374,21 +383,32 @@ export function scoreCommanders(
     }
     if (includedCardCount === 0) continue;
 
-    const candidateTypes = unitCreatureTypes(unit);
-    const matchedCreatureTypes = candidateTypes.filter(
-      (t) => (profile.creatureTypeCounts[t] ?? 0) >= MIN_SIGNAL_COUNT
-    );
+    const tribeSupport: TribeSupport[] = unitCreatureTypes(unit)
+      .map((type) => ({
+        type,
+        cards: (profile.creatureTypeCards[type] ?? []).filter(fitsIdentity).map(toSupportingCard),
+      }))
+      .filter((t) => t.cards.length >= MIN_SIGNAL_COUNT);
+    const matchedCreatureTypes = tribeSupport.map((t) => t.type);
 
-    const candidateKeywords = unitKeywords(unit);
-    const matchedKeywords = candidateKeywords.filter(
-      (k) => (profile.keywordCounts[k] ?? 0) >= MIN_SIGNAL_COUNT
-    );
+    const keywordSupport: KeywordSupport[] = unitKeywords(unit)
+      .map((keyword) => ({
+        keyword,
+        cards: (profile.keywordCards[keyword] ?? []).filter(fitsIdentity).map(toSupportingCard),
+      }))
+      .filter((k) => k.cards.length >= MIN_SIGNAL_COUNT);
+    const matchedKeywords = keywordSupport.map((k) => k.keyword);
 
     const candidateText = unitOracleText(unit);
-    const matchedThemeDefs = THEMES.filter(
-      (def) => (profile.themeCounts[def.key] ?? 0) >= MIN_SIGNAL_COUNT && matchesTheme(def, candidateText)
-    );
+    const matchedThemeEntries = THEMES.filter((def) => matchesTheme(def, candidateText))
+      .map((def) => ({
+        def,
+        cards: (profile.themeCards[def.key] ?? []).filter(fitsIdentity).map(toSupportingCard),
+      }))
+      .filter((t) => t.cards.length >= MIN_SIGNAL_COUNT);
+    const matchedThemeDefs = matchedThemeEntries.map((t) => t.def);
     const matchedThemeKeys = new Set(matchedThemeDefs.map((d) => d.key));
+    const themeCardsByKey = new Map(matchedThemeEntries.map((t) => [t.def.key, t.cards]));
 
     const matchedArchetypes = ARCHETYPES.filter(
       (arch) => arch.componentKeys.filter((k) => matchedThemeKeys.has(k)).length >= arch.minComponents
@@ -411,26 +431,16 @@ export function scoreCommanders(
         cards: dedupeCards(
           arch.componentKeys
             .filter((k) => matchedThemeKeys.has(k))
-            .flatMap((k) => (profile.themeCards[k] ?? []).filter(fitsIdentity).map(toSupportingCard))
+            .flatMap((k) => themeCardsByKey.get(k) ?? [])
         ),
       })),
-      ...matchedThemeDefs.map((def) => ({
+      ...matchedThemeEntries.map(({ def, cards }) => ({
         key: def.key,
         label: def.label,
         description: def.description,
-        cards: (profile.themeCards[def.key] ?? []).filter(fitsIdentity).map(toSupportingCard),
+        cards,
       })),
     ];
-
-    const tribeSupport: TribeSupport[] = matchedCreatureTypes.map((type) => ({
-      type,
-      cards: (profile.creatureTypeCards[type] ?? []).filter(fitsIdentity).map(toSupportingCard),
-    }));
-
-    const keywordSupport: KeywordSupport[] = matchedKeywords.map((keyword) => ({
-      keyword,
-      cards: (profile.keywordCards[keyword] ?? []).filter(fitsIdentity).map(toSupportingCard),
-    }));
 
     const gameChangerCards = owned
       .filter((entry) => entry.row.game_changer && fitsIdentity(entry))
