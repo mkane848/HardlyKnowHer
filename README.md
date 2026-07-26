@@ -123,6 +123,25 @@ Card names are matched exactly, case-insensitively — there's no fuzzy
 matching, so anything unrecognised comes back in the "not found" list rather
 than being guessed at.
 
+### Quantities and the singleton rule
+
+Commander is a singleton format (rule 903.5b), so extra copies of a card are
+ignored when scoring — a list is read as the deck you could legally build
+from it, not as a pile. Ten copies of one card count once, and cannot make a
+theme look supported on their own. Three exemptions are honoured, read off
+the cards themselves rather than from a hardcoded list:
+
+- **Basic lands**, by supertype — so snow basics and Wastes are covered too.
+- Cards reading **"A deck can have any number of cards named …"** (Relentless
+  Rats, Shadowborn Apostle, Dragon's Approach, and friends).
+- Cards reading **"A deck can have up to _N_ cards named …"**, kept to `N`
+  (Seven Dwarves, Nazgûl).
+
+Repeats of a card across several lines are merged before this is applied, so
+listing the same card three times is the same as listing it once. Whatever
+gets trimmed is reported back as "*N* extra copies ignored" next to the
+matched count, so a trimmed list never looks like a failed lookup.
+
 ## Partner, Background, and every other command-zone pairing
 
 A commander with **Partner**, **Partner — [text]**, **Partner with [Name]**,

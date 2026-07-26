@@ -205,6 +205,8 @@ server/                Express + TS + better-sqlite3
                                 takes `commanderNames: string[]` (1-2) for a Partner unit
     services/
       parseList.ts            decklist text -> [{name, quantity}]; handles the major export formats
+      singleton.ts             merges repeated cards and trims copies to what 903.5b allows,
+                                before anything is scored
       partners.ts              builds every legal `CommanderUnit` (solo + Partner-family pairs)
                                 from the candidate pool — see "Partner/Background" below
       synergy.ts               profile-building + commander scoring (the core logic), operating on
@@ -220,6 +222,7 @@ server/                Express + TS + better-sqlite3
     test-spellbook.ts          npm test — Spellbook adapter cases, against a local mock
     test-bracket.ts             npm test — Bracket-estimate cases
     test-partners.ts             npm test — every pairing variant + negative cases (rule 702.124)
+    test-singleton.ts             npm test — copy limits, exemptions, and repeated-line merging
     test-synergy.ts               npm test — profiling + scoring, incl. union-across-a-pair semantics
   data/                     gitignored; oracle-cards.json + cards.sqlite live here
 ```

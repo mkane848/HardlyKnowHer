@@ -11,6 +11,16 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ### Changed
 
+- Submitted lists are now read as a legal Commander deck rather than as a
+  pile of cards: extra copies beyond what the singleton rule (903.5b)
+  allows are ignored when scoring. Basic lands, "any number of cards
+  named …" cards, and "up to N cards named …" cards keep their copies, all
+  read off the card's own text and type line. Repeats of one card spread
+  across several lines are merged first, so a card listed three times can
+  no longer pass for three different cards supporting a theme. Anything
+  trimmed is reported as "N extra copies ignored" beside the matched
+  count.
+
 - A theme, tribe, or keyword now needs at least **three** supporting cards
   to count, measured after narrowing to that commander's own colour
   identity. Below that it is dropped from the recommendation engine
