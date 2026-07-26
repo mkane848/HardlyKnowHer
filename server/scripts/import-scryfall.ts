@@ -56,6 +56,19 @@ db.exec(`
   );
   CREATE INDEX idx_cards_name_lower ON cards(name_lower);
   CREATE INDEX idx_cards_commander_eligible ON cards(is_commander_eligible);
+
+  -- Lets a double-faced card be found by either face's name alone (e.g. a
+  -- pasted decklist naming just "Fable of the Mirror-Breaker", not the full
+  -- "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki"). Scoped to
+  -- true DFC layouts (transform, modal_dfc) — cards that are physically two
+  -- sides of one card — not split/adventure/flip cards, which share a
+  -- single face and are a different case.
+  DROP TABLE IF EXISTS card_face_names;
+  CREATE TABLE card_face_names (
+    face_name_lower TEXT NOT NULL,
+    oracle_id TEXT NOT NULL
+  );
+  CREATE INDEX idx_face_names_lower ON card_face_names(face_name_lower);
 `);
 
 function parseCreatureTypes(typeLine: string): string[] {
@@ -77,6 +90,12 @@ const insert = db.prepare(`
     @legality_commander, @game_changer, @is_legendary, @is_commander_eligible, @image_uri
   )
 `);
+
+const insertFaceName = db.prepare(`
+  INSERT INTO card_face_names (face_name_lower, oracle_id) VALUES (?, ?)
+`);
+
+const DFC_LAYOUTS = new Set(['transform', 'modal_dfc']);
 
 let imported = 0;
 let skipped = 0;
@@ -129,6 +148,12 @@ const insertMany = db.transaction((rows: any[]) => {
       image_uri: imageUri,
     });
     imported++;
+
+    if (DFC_LAYOUTS.has(card.layout) && Array.isArray(card.card_faces)) {
+      for (const face of card.card_faces as { name?: string }[]) {
+        if (face.name) insertFaceName.run(face.name.toLowerCase(), card.oracle_id);
+      }
+    }
   }
 });
 
@@ -147,5 +172,7 @@ const gameChangers = db
 console.log(`${eligible.c} cards are Commander-eligible.`);
 console.log(`${banned.c} cards are currently banned in Commander.`);
 console.log(`${gameChangers.c} cards are on the Game Changers list.`);
+const faceNames = db.prepare('SELECT COUNT(*) as c FROM card_face_names').get() as { c: number };
+console.log(`${faceNames.c} double-faced card face names indexed for single-side matching.`);
 
 db.close();

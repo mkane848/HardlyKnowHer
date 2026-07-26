@@ -25,12 +25,31 @@ function tableExists(name: string): boolean {
 // confusing SQL error when the database is still empty.
 export const isSeeded = tableExists('cards');
 
+const exactNameStmt = db.prepare('SELECT * FROM cards WHERE name_lower = ? LIMIT 1');
+
+// card_face_names is a newer table than `cards`; a database seeded before it
+// existed would still pass isSeeded. Guard its existence rather than let a
+// stale local DB crash the server on the first prepared statement — the
+// fallback below just degrades to exact-name-only matching, same as before
+// this table existed.
+const faceNameStmt = tableExists('card_face_names')
+  ? db.prepare(`
+      SELECT cards.* FROM card_face_names
+      JOIN cards ON cards.oracle_id = card_face_names.oracle_id
+      WHERE card_face_names.face_name_lower = ?
+      LIMIT 1
+    `)
+  : null;
+
 export function findCardsByNames(names: string[]): Map<string, CardRow> {
-  const stmt = db.prepare('SELECT * FROM cards WHERE name_lower = ? LIMIT 1');
   const map = new Map<string, CardRow>();
   for (const name of names) {
-    const row = stmt.get(name.toLowerCase()) as CardRow | undefined;
-    if (row) map.set(name.toLowerCase(), row);
+    const lower = name.toLowerCase();
+    // Exact full name first — this is what most cards are, and it's what
+    // stops a double-faced card's own back-face name from ever shadowing a
+    // real single-faced card that happens to share it.
+    const row = (exactNameStmt.get(lower) ?? faceNameStmt?.get(lower)) as CardRow | undefined;
+    if (row) map.set(lower, row);
   }
   return map;
 }
