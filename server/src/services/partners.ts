@@ -1,134 +1,123 @@
-/**
- * Commander pairing rules — the mechanics that let a deck have two cards in
- * the command zone rather than one.
- *
- * Detection reads the oracle text and type line rather than Scryfall's
- * `keywords` array, because the array doesn't consistently carry the
- * pairing abilities (Backgrounds are a subtype, not a keyword; "Partner
- * with" and the restricted "Partner — X" variants collapse to plain
- * "Partner"). The text is what the rules actually key off, and it's what
- * these can be tested against deterministically.
- *
- * Covered here:
- *   Partner                  two cards that each have plain Partner
- *   Partner with [name]      pairs only with the one card it names
- *   Partner — [group]        pairs only within its own named group
- *   Choose a Background      a creature plus a Background enchantment
- *   Friends forever          two cards that each have Friends forever
- *   Doctor's companion       a companion plus a legendary Time Lord Doctor
- */
-
-export type PairingKind =
-  | 'partner'
-  | 'partner-with'
-  | 'partner-restricted'
-  | 'choose-background'
-  | 'background'
-  | 'friends-forever'
-  | 'doctors-companion'
-  | 'time-lord-doctor';
-
-export interface Pairing {
-  kind: PairingKind;
-  /**
-   * For 'partner-with', the card it names. For 'partner-restricted', the
-   * group label ("Father & Son"). Null for the kinds that pair on the
-   * mechanic alone.
-   */
-  label: string | null;
-}
-
-/** How each mechanic is described in the UI. */
-export const PAIRING_LABELS: Record<PairingKind, string> = {
-  partner: 'Partner',
-  'partner-with': 'Partner with',
-  'partner-restricted': 'Partner',
-  'choose-background': 'Choose a Background',
-  background: 'Background',
-  'friends-forever': 'Friends forever',
-  'doctors-companion': "Doctor's companion",
-  'time-lord-doctor': 'Doctor',
-};
-
-// Anchored to the start of a line so the reminder text these abilities carry
-// ("(You can have two commanders if both have partner.)") can't match on its
-// own, and so an unrelated mid-sentence mention of a word never counts.
-const PARTNER_WITH = /^Partner with ([^\n(]+)/m;
-const PARTNER_RESTRICTED = /^Partner\s*[—-]\s*([^\n(]+)/m;
-const PARTNER_PLAIN = /^Partner\b(?!\s+with\b)(?!\s*[—-])/m;
-const CHOOSE_BACKGROUND = /^Choose a Background\b/m;
-const FRIENDS_FOREVER = /^Friends forever\b/m;
-const DOCTORS_COMPANION = /^Doctor's companion\b/m;
+import type { CardRow } from '../types';
 
 /**
- * Identifies which pairing mechanic a card has, if any.
- *
- * Type-line checks come first: a Background and a Time Lord Doctor are
- * identified by what they *are*, and neither carries the pairing wording in
- * its own text — it's the partner side that names them.
+ * A commander as actually played: one card, or two under a Partner-family
+ * ability (702.124). Every card in `cards` is jointly "the commander" —
+ * there's no primary/secondary in the rules (702.124e), so this is an array
+ * rather than a "main card + optional partner" shape.
  */
-export function detectPairing(typeLine: string | null, oracleText: string | null): Pairing | null {
-  const types = typeLine ?? '';
-  const text = oracleText ?? '';
-
-  if (/\bBackground\b/.test(types)) return { kind: 'background', label: null };
-  if (/\bTime Lord Doctor\b/.test(types)) return { kind: 'time-lord-doctor', label: null };
-
-  const withMatch = text.match(PARTNER_WITH);
-  if (withMatch) return { kind: 'partner-with', label: withMatch[1].trim() };
-
-  const restrictedMatch = text.match(PARTNER_RESTRICTED);
-  if (restrictedMatch) return { kind: 'partner-restricted', label: restrictedMatch[1].trim() };
-
-  if (PARTNER_PLAIN.test(text)) return { kind: 'partner', label: null };
-  if (CHOOSE_BACKGROUND.test(text)) return { kind: 'choose-background', label: null };
-  if (FRIENDS_FOREVER.test(text)) return { kind: 'friends-forever', label: null };
-  if (DOCTORS_COMPANION.test(text)) return { kind: 'doctors-companion', label: null };
-
-  return null;
+export interface CommanderUnit {
+  cards: CardRow[];
 }
 
-export interface PairingSide {
-  name: string;
-  pairing: Pairing;
+function parseJsonArray(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
-const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-const sameLabel = (a: string | null, b: string | null) =>
-  !!a && !!b && a.toLowerCase() === b.toLowerCase();
+function creatureTypeSet(card: CardRow): Set<string> {
+  return new Set(parseJsonArray(card.creature_types));
+}
+
+function setEquals(a: Set<string>, b: Set<string>): boolean {
+  return a.size === b.size && [...a].every((item) => b.has(item));
+}
+
+/** Stable id for a unit, used to dedupe pairs regardless of which card was found first. */
+export function unitKey(unit: CommanderUnit): string {
+  return unit.cards
+    .map((c) => c.oracle_id)
+    .sort()
+    .join('+');
+}
 
 /**
- * Whether two cards may sit in the command zone together.
+ * Builds every legal "commander unit" from the eligible candidate pool: one
+ * per solo card, plus one per valid Partner/Partner-with/Partner—suffix/
+ * Friends-forever/Choose-a-Background/Doctor's-companion pair.
  *
- * Symmetric, and deliberately strict: "Partner with" pairs only with the
- * card it names (not with the generic Partner pool), and a restricted
- * "Partner — X" pairs only inside its own group.
+ * Pairing is grouped by ability variant rather than a blind cross-product
+ * over every candidate — with an eligible pool in the tens to low hundreds,
+ * pairing only within (or against) the relevant sub-groups keeps this cheap
+ * enough to run per request, which is what was asked for. Different partner
+ * variants never combine with each other (702.124f) — a plain-Partner card
+ * cannot pair with a Partner-with card, for instance — which pairing only
+ * within each group already guarantees.
+ *
+ * A card with a partner ability still gets its own solo unit too: every
+ * variant here is optional (903.3 / 702.124a), so a Partner card is a
+ * perfectly legal commander by itself. The one exception is Background
+ * enchantments, which never appear as a solo candidate in the first place
+ * (they're not a creature/Vehicle/Spacecraft, so getCommanderCandidates
+ * already excludes them) and are only ever reached here as a pairing target.
  */
-export function canPair(a: PairingSide, b: PairingSide): boolean {
-  if (sameName(a.name, b.name)) return false;
+export function buildCommanderUnits(candidates: CardRow[], backgrounds: CardRow[]): CommanderUnit[] {
+  const units: CommanderUnit[] = candidates.map((card) => ({ cards: [card] }));
+  const seenPairs = new Set<string>();
 
-  const kinds = [a.pairing.kind, b.pairing.kind];
-  const has = (kind: PairingKind) => kinds.includes(kind);
-
-  if (a.pairing.kind === 'partner' && b.pairing.kind === 'partner') return true;
-  if (a.pairing.kind === 'friends-forever' && b.pairing.kind === 'friends-forever') return true;
-
-  if (a.pairing.kind === 'partner-restricted' && b.pairing.kind === 'partner-restricted') {
-    return sameLabel(a.pairing.label, b.pairing.label);
+  function addPair(a: CardRow, b: CardRow): void {
+    if (a.oracle_id === b.oracle_id) return;
+    const key = [a.oracle_id, b.oracle_id].sort().join('+');
+    if (seenPairs.has(key)) return;
+    seenPairs.add(key);
+    units.push({ cards: [a, b] });
   }
 
-  // "Partner with" is printed on both halves naming each other, but only one
-  // side needs to name the other for the pair to be legal.
-  if (a.pairing.kind === 'partner-with' && sameName(a.pairing.label ?? '', b.name)) return true;
-  if (b.pairing.kind === 'partner-with' && sameName(b.pairing.label ?? '', a.name)) return true;
+  function pairAllWithin(group: CardRow[]): void {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) addPair(group[i], group[j]);
+    }
+  }
 
-  if (has('choose-background') && has('background')) return true;
-  if (has('doctors-companion') && has('time-lord-doctor')) return true;
+  const byAbility = (ability: CardRow['partner_ability']) =>
+    candidates.filter((c) => c.partner_ability === ability);
 
-  return false;
-}
+  // Plain Partner: any two.
+  pairAllWithin(byAbility('partner'));
 
-/** The colour identity of a pair is the union of both halves. */
-export function combineIdentity(a: string[], b: string[]): string[] {
-  return [...new Set([...a, ...b])];
+  // Partner—[text]: only within the same suffix group.
+  const suffixGroups = new Map<string, CardRow[]>();
+  for (const card of byAbility('partner_suffix')) {
+    const key = card.partner_target ?? '';
+    const group = suffixGroups.get(key);
+    if (group) group.push(card);
+    else suffixGroups.set(key, [card]);
+  }
+  for (const group of suffixGroups.values()) pairAllWithin(group);
+
+  // Partner with [Name]: symmetric named pairing — each card must name the
+  // other (702.124j), not just be named by it.
+  const byNameLower = new Map(candidates.map((c) => [c.name_lower, c]));
+  for (const card of byAbility('partner_with')) {
+    const target = card.partner_target ? byNameLower.get(card.partner_target) : undefined;
+    if (target?.partner_ability === 'partner_with' && target.partner_target === card.name_lower) {
+      addPair(card, target);
+    }
+  }
+
+  // Friends forever: any two. Restricted to creatures by the rule (702.124k),
+  // which every real friends-forever card already satisfies as printed —
+  // checked anyway rather than assumed, since nothing stops a future card
+  // from breaking that pattern.
+  pairAllWithin(byAbility('friends_forever').filter((c) => (c.type_line ?? '').includes('Creature')));
+
+  // Choose a Background: the companion card × every legal legendary Background.
+  for (const chooser of byAbility('choose_background')) {
+    for (const background of backgrounds) addPair(chooser, background);
+  }
+
+  // Doctor's companion: the companion card × any legendary creature whose
+  // creature types are *exactly* Time Lord and Doctor — no other subtypes.
+  const timeLordDoctor = new Set(['Time Lord', 'Doctor']);
+  const doctors = candidates.filter((c) => setEquals(creatureTypeSet(c), timeLordDoctor));
+  for (const companion of byAbility('doctors_companion')) {
+    for (const doctor of doctors) addPair(companion, doctor);
+  }
+
+  return units;
 }

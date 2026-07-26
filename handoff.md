@@ -107,39 +107,73 @@ way.
 
 ## File map
 
+This map is meant to stay current — update it in the same commit whenever
+you add or rename a file here, rather than letting it drift like it did for
+most of this project's early history.
+
 ```
-package.json          root convenience script (npm run dev via concurrently)
+package.json          root convenience script (npm run dev via concurrently); canonical app version
 render.yaml            Render Blueprint — provisions both services
 README.md              setup + usage instructions for a human
 DEPLOY.md              Render deployment walkthrough
+CHANGELOG.md            Keep a Changelog + SemVer — bump this and the version together
 
-client/                Vite + React + TS + Zustand
-  vite.config.ts         dev-server proxy: /api -> localhost:4000
+client/                Vite + React + TS + Zustand + TanStack Query
+  vite.config.ts         dev-server proxy: /api -> localhost:4000; injects __APP_VERSION__
   .env.example            documents VITE_API_URL (blank in dev)
   src/
-    main.tsx, App.tsx     entry point / page shell
+    main.tsx, App.tsx     entry point / page shell / navbar
     index.css              design system: parchment/ink palette, mana pips
-    store/useAppStore.ts   rawList, result, isLoading, error
-    api/client.ts           fetchRecommendations() -> POST /api/recommend
-    types/index.ts          DTOs mirroring the server's response shape
+    store/useAppStore.ts   client state only: rawList, submittedList, dismissed
+    api/
+      client.ts             fetchRecommendations/fetchCombos, wakeServer, cold-start retry
+      queries.ts             TanStack Query hooks wrapping the above
+    lib/
+      mtg.ts                 WUBRG ordering, colour-identity naming (Dimir, Golgari, ...)
+      filters.ts              SuggestionFilters + matching logic (color/category/bracket/theme)
+      manaSymbols.ts           inlined SVG path data for the 6 mana glyphs
+    types/index.ts          DTOs mirroring the server's response shape — a suggestion is
+                             `{ unitId, cards: CommanderCardDTO[], colorIdentity, ... }`, one-or-two
+                             cards per unit, not a single flattened card
     components/
-      CardListUpload.tsx     paste or upload .txt, submit
-      RecommendationResults.tsx  match summary + not-found list
-      CommanderCard.tsx        one suggestion: pips, badges, bracket note
+      CardListUpload.tsx        paste or upload .txt, submit; collapses after a load succeeds
+      RecommendationResults.tsx  filter bar + paginated suggestion grid
+      ResultFilters.tsx          color/color-category/bracket/theme filter controls
+      CommanderCard.tsx          one suggestion: pips, one `CommanderFace` per card (1 or 2),
+                                  "why" disclosure
+      CardDetailDialog.tsx        full-card modal for one card of a unit (art, mana cost, full
+                                   text, Scryfall link); takes `card` + the unit's shared `bracket`
+      ManaSymbol.tsx, ManaCost.tsx  render mana pips / a full cost string
+      ComboFinder.tsx             click-to-run Commander Spellbook lookup inside a suggestion;
+                                   takes `commanderNames: string[]` (1 or 2) for pair support
+      AboutDialog.tsx             version, credits, repo link
 
 server/                Express + TS + better-sqlite3
   src/
     index.ts               app entry; CORS via optional CLIENT_ORIGIN env var
-    db.ts                   SQLite connection + findCardsByNames / getCommanderCandidates
-    types.ts                CardRow shape (mirrors the cards table)
-    routes/recommend.ts      POST /api/recommend — the only endpoint
+    db.ts                   SQLite connection; findCardsByNames (incl. DFC face-name fallback),
+                             getCommanderCandidates, getBackgroundCards (legal legendary Backgrounds)
+    types.ts                CardRow shape (mirrors the cards table), incl. partner_ability/
+                             partner_target/is_background (rule 702.124)
+    routes/
+      recommend.ts            POST /api/recommend
+      combos.ts                POST /api/combos — proxies to Commander Spellbook, on request only;
+                                takes `commanderNames: string[]` (1-2) for a Partner unit
     services/
-      parseList.ts            decklist text -> [{name, quantity}]
-      synergy.ts               profile-building + commander scoring (the core logic)
+      parseList.ts            decklist text -> [{name, quantity}]; handles the major export formats
+      partners.ts              builds every legal `CommanderUnit` (solo + Partner-family pairs)
+                                from the candidate pool — see "Partner/Background" below
+      synergy.ts               profile-building + commander scoring (the core logic), operating on
+                                `CommanderUnit`s (1-2 cards), not single cards
       bracket.ts               Game-Changer-count -> Bracket estimate
+      spellbook.ts             Commander Spellbook adapter: cache, backoff, response normalisation
   scripts/
-    fetch-scryfall.ts        downloads current Oracle Cards bulk file from Scryfall's API
-    import-scryfall.ts       parses that file into server/data/cards.sqlite
+    fetch-scryfall.ts        downloads current Oracle Cards bulk file (skips if a recent copy exists)
+    import-scryfall.ts       parses that file into server/data/cards.sqlite + card_face_names;
+                             also detects Partner-family abilities and Background enchantments
+                             (rule 702.124) from oracle text
+    test-parse-list.ts        npm test — parser cases (node:assert via tsx)
+    test-spellbook.ts          npm test — Spellbook adapter cases, against a local mock
   data/                     gitignored; oracle-cards.json + cards.sqlite live here
 ```
 
@@ -174,19 +208,63 @@ server/                Express + TS + better-sqlite3
   from a best reading of their API. If real responses come back empty, the
   field mapping in `normalizeVariant` is the first thing to check.
 
+- **`partners.ts`** — builds every legal `CommanderUnit` (rule 702.124: a
+  commander as actually played, one card or two) from the eligible candidate
+  pool: one solo unit per candidate, plus one pair per valid Partner,
+  Partner—[text], Partner with [Name], Friends forever, Choose a Background,
+  or Doctor's companion combination. A card with a partner ability still gets
+  its own solo unit too — every variant is optional, so e.g. a Partner card
+  is a perfectly legal commander by itself, and both the solo and every valid
+  pairing show up as separate entries on the same ranked suggestion list
+  (not a separate section, and not precomputed — this runs fresh per
+  request). Pairing is grouped by ability variant rather than a blind
+  cross-product over the whole pool (different variants never combine with
+  each other per 702.124f), which keeps it cheap enough to run per request
+  with an eligible pool in the tens to low hundreds. `Partner with [Name]` is
+  checked for symmetric naming (each card must name the other, not just be
+  named by it); Doctor's companion is checked for an *exact* {Time Lord,
+  Doctor} creature-type set, not just "has those types among others."
+
 - **`synergy.ts`** — the heart of the app.
   1. Builds a `CollectionProfile` from the matched cards: color-identity
-     counts, creature-type counts, and counts against ~12 hand-picked
-     oracle-text theme regexes (sacrifice, graveyard, +1/+1 counters,
-     tokens, artifacts, spellslinger, lifegain, draw, mill, aristocrats,
-     landfall, reanimation).
-  2. Scores every Commander-eligible, currently-legal card: requires
-     nonzero color-identity overlap AND at least one tribal/theme signal
-     (signal threshold: appears ≥2 times in the list) to even be
-     considered. Score = `coverageRatio * 50 + tribalMatches * 15 +
-     themeMatches * 10`.
+     counts, creature-type counts, keyword counts (from Scryfall's
+     `keywords` field — e.g. a Flying-heavy list), and counts against a set
+     of hand-picked oracle-text theme regexes (sacrifice, graveyard,
+     +1/+1 counters, tokens, artifacts, enchantments, planeswalkers,
+     equipment, auras, spellslinger, lifegain, draw, mill, death triggers,
+     landfall, reanimation, doublers/multipliers).
+  2. `ARCHETYPES` is a second layer on top of the theme list: a named label
+     (Aristocrats, Voltron) for a *combination* of themes, applied when a
+     candidate matches enough of the archetype's component theme keys.
+     Spellslinger is **not** in this layer — it's just the existing
+     `spellslinger` theme under its real name, since that already was the
+     archetype under a blander label; adding a parallel archetype for it
+     would just duplicate the same detection twice.
+  3. Scores every `CommanderUnit` from `partners.ts` (not a single `CardRow`
+     — see above): requires nonzero color-identity overlap AND at least one
+     tribal/theme/keyword/archetype signal (signal threshold: appears ≥2
+     times in the list) to even be considered. Every signal is unioned
+     across both cards in a pair (`unitColorIdentity`/`unitCreatureTypes`/
+     `unitKeywords`/`unitOracleText`) per rule 702.124e — a Partner pair
+     matches anything either half of it would match solo, and its combined
+     color identity is the union, not the intersection. Score =
+     `coverageRatio * 50 + tribalMatches * 15 + themeMatches * 10 +
+     keywordMatches * 8 + archetypeMatches * 20`.
+  - Partner-family keywords (Partner, Partner with, Friends forever, Choose
+    a Background, Doctor's companion) are excluded from the shared-keyword
+    signal on purpose — they mean something structural about who can be
+    your commander, not a thematic pattern, and showing "Partner" as a
+    generic shared-keyword tag would read as a confused echo of the
+    dedicated Partner/Background handling in `partners.ts`, not a second,
+    unrelated theme.
+  - Every signal here requires the *candidate's own text* to match too, not
+    just the profile. This is consistent but has a real cost for Voltron
+    specifically: a commander that's a great Voltron target purely on
+    stats (evasive, hard to remove) but whose own text never says
+    "equip"/"enchant"/"Aura" won't be flagged. Documented in the archetype's
+    own description string, not hidden.
   - This is intentionally a short, readable heuristic, not a combo/archetype
-    model — documented as a known limitation, not a bug to silently "fix"
+    *engine* — documented as a known limitation, not a bug to silently "fix"
     into something more complex without discussing it first.
 
 - **`bracket.ts`** — Bracket estimate is based *only* on Game Changer count
@@ -197,7 +275,16 @@ server/                Express + TS + better-sqlite3
   caveat is surfaced in the UI copy; keep it there if this logic changes.
 
 - **`db.ts`** — `isSeeded` check so the API returns a helpful 503 instead
-  of a raw SQL error if `npm run prepare-data` hasn't been run yet.
+  of a raw SQL error if `npm run prepare-data` hasn't been run yet. Also
+  the double-faced-card lookup: `findCardsByNames` tries the full card name
+  first, then falls back to a `card_face_names` table (built in
+  `import-scryfall.ts` for `transform`/`modal_dfc` layouts only) so a
+  decklist naming just one face — "Fable of the Mirror-Breaker" rather than
+  the full "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki" —
+  still matches. That table is checked for existence before use (via the
+  same `tableExists` helper `isSeeded` uses) so an old local database from
+  before this existed degrades to exact-match-only instead of crashing the
+  server on the first prepared statement.
 
 ## Known risk areas / things to verify
 
@@ -265,4 +352,108 @@ Untested end-to-end — see "Known risk areas" above.
 - No user accounts, saved lists, or deck history
 - No fuzzy/typo-tolerant card name matching
 - No combo detection for Bracket estimation
-- No EDHREC data of any kind, scraped or otherwise
+- No EDHREC data pulled yet — see "Pending decisions" below. A
+  **non-functional** "EDHRec" placeholder button sits next to "Find combos"
+  in `ComboFinder.tsx`; it fetches nothing and is `disabled`. The original
+  "no EDHREC data of any kind" instruction has been clarified, not
+  rescinded: the user wants to wait until this can be done responsibly, not
+  ruled it out in principle.
+
+## Pending decisions — proposed, not implemented
+
+- **EDHREC integration.** Still not built — the placeholder button above is
+  the only trace of this in the codebase. The user's current lean (as of
+  the conversation that added the placeholder): a one-time, click-triggered
+  lookup per commander, the same shape as the existing Commander Spellbook
+  "Find combos" flow, rather than anything that runs automatically or scrapes
+  in bulk. Don't wire up the button or add any EDHREC network call without
+  the user confirming the approach first — the same politeness/caching
+  discipline documented for `spellbook.ts` above should apply here once it's
+  built (identifying User-Agent, cache repeat lookups, respect rate limits).
+
+## Partner / Background support (rule 702.124)
+
+Implemented: a commander suggestion with a Partner-family ability generates
+both a solo entry and one entry per valid pairing, unified on the same
+ranked list (see `partners.ts` and `synergy.ts` above). Covers all six
+variants: Partner, Partner—[text] (grouped by suffix), Partner with [Name]
+(symmetric name check), Friends forever, Choose a Background (paired against
+every legal legendary Background), and Doctor's companion (paired against
+an exact {Time Lord, Doctor} creature-type set). `CommanderSuggestion.cards`
+is `CardRow[]` (length 1 or 2); the API's `CommanderSuggestionDTO.cards` is
+`CommanderCardDTO[]` with a top-level `unitId` (both oracle ids, sorted and
+joined — see `unitKey()`) used as the dismiss/row key instead of a single
+card's own id. `/api/combos` takes `commanderNames: string[]` (1-2) so a
+Spellbook lookup can be run against a pair. There is no "Partner" badge in
+the UI by design — Partner-family keywords stay excluded from the generic
+shared-keyword signal (see `synergy.ts`'s `EXCLUDED_KEYWORDS` note) rather
+than surfaced as a tag, since the pairing itself is the feature.
+Unverified against real Scryfall data — this environment has no network
+access to Scryfall, so the detection regexes and pairing logic were
+validated against hand-authored fixtures modeled on real card templating,
+not the live bulk file. Worth a spot-check against a handful of real
+Partner/Background cards (e.g. Tymna the Weaver, Kraum Ludevic's Opus,
+Tiana Ship's Caretaker + a real Background) after the next `prepare-data`
+run.
+
+## Merged with `main`'s independent Partner/Background work
+
+While this branch built the above, a separate PR (`main`, PR #2, commit
+`7997147`) independently built the *same* feature with a different design:
+single-card suggestions carrying a `pairing` field plus a `partnerOptions[]`
+list you choose a second commander from, computed by `detectPairing`/
+`canPair`/`buildPartnerOptions` in its own `partners.ts`/`synergy.ts`. Both
+landed on their respective branches at the same time, then had to be
+reconciled in one merge. The user chose to keep **this branch's** design
+(precomputed pairs, each its own ranked suggestion) over main's
+(pick-a-partner-after-the-fact) — if that decision ever needs revisiting,
+main's approach is still recoverable from its own git history.
+
+main also carried real, independent work unrelated to Partner/Background,
+which was carried forward on top of the kept design:
+- **Art preview** — `CardImageDialog.tsx` (whole-card image popover,
+  separate from the rules-text `CardDetailDialog`), wired onto commander
+  art and every supporting-card name. `SupportingCard`/`SupportingCardDTO`
+  and `CommanderCardDTO` gained `imageUri`/`scryfallUri`/`manaValue` fields
+  for this.
+- **Sort mode** — `lib/sort.ts` ("Best match" vs "Colors, name, mana
+  value"), adapted from main's single-card version to compare a unit's
+  joined display name and summed mana value across 1-2 cards.
+- **Export** — "Copy list" / "Download .txt" in `RecommendationResults.tsx`.
+- **Mobile layout** — `viewport-fit=cover` + the `env(safe-area-inset-*)`
+  padding in `index.css`, so content clears notches/home-indicator/URL bar.
+- **"Still has supporting cards" fix** — `lib/suggestions.ts`
+  (`visibleThemeSupport`/`visibleTribeSupport`, extended here with a
+  `visibleKeywordSupport` for the keyword category main didn't have): a
+  theme/tribe/keyword matched against the collection *globally* can end up
+  with zero cards once narrowed to a specific commander's colour identity;
+  this filters those out of both the card display and the filter bar's
+  available options instead of showing/offering an empty reason. This was
+  a real latent bug in this branch's original synergy.ts too, not something
+  specific to main's design.
+- **Regression test suite** — main added `client/scripts/test-*.ts` +
+  `server/scripts/test-bracket.ts`, dependency-free (node:assert + tsx,
+  matching this project's existing test convention). Kept: `test-mtg.ts`,
+  `test-bracket.ts` (untouched by either side's Partner work, ported as-is);
+  adapted to this branch's DTO/filter shape: `fixtures.ts`,
+  `test-suggestions.ts`, `test-sort.ts`, `test-filters.ts` (rewritten
+  against this branch's simple array-based `SuggestionFilters`, not main's
+  include/exclude `FilterSelection` model — see below). **Deleted**:
+  `test-partners.ts`, `test-synergy.ts` — these tested main's discarded
+  `detectPairing`/`canPair`/`buildPartnerOptions` API, which no longer
+  exists. This branch's `partners.ts`/`synergy.ts` still have no automated
+  test coverage of their own (only the hand-fixture verification noted
+  above) — worth writing if this file changes again.
+
+**Deliberately not adopted**: main also rewrote the filter bar from a
+multi-select "must include" model to a three-state include/exclude-per-value
+model (`FilterMode`, `cycleSelection`, `modeOf` in its `lib/filters.ts`,
+click-to-cycle chips in `ResultFilters.tsx`). That's a real, independent
+filter-UX upgrade, but it wasn't part of what was asked to be carried
+forward (sort/export/art-preview/mobile-layout/tests were) and swapping the
+whole filtering paradigm felt like a bigger call to make unilaterally mid-
+merge. This branch kept its original simple filter model (colours + a
+colorless/multicolor category toggle + brackets + themes, all "must
+include", via Radix `ToggleGroup`) and only added the sort control to it.
+If the include/exclude model is wanted later, it's sitting in main's git
+history (`lib/filters.ts`, `ResultFilters.tsx`) ready to port over.

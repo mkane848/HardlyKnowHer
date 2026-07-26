@@ -1,4 +1,4 @@
-import type { CommanderSuggestionDTO, ThemeSupportDTO, TribeSupportDTO } from '../types';
+import type { CommanderSuggestionDTO, KeywordSupportDTO, ThemeSupportDTO, TribeSupportDTO } from '../types';
 
 /**
  * A theme or tribe can be "matched" against the collection as a whole, but
@@ -26,4 +26,15 @@ export function visibleThemeLabels(suggestion: CommanderSuggestionDTO): string[]
 
 export function visibleTribeTypes(suggestion: CommanderSuggestionDTO): string[] {
   return visibleTribeSupport(suggestion).map((tribe) => tribe.type);
+}
+
+// Keywords have the same "matched globally, empty once filtered to this
+// commander's colour identity" problem as themes and tribes above — there's
+// no equivalent on main, since its synergy scoring dropped keyword support.
+export function visibleKeywordSupport(suggestion: CommanderSuggestionDTO): KeywordSupportDTO[] {
+  return suggestion.keywordSupport.filter((keyword) => keyword.cards.length > 0);
+}
+
+export function visibleKeywordLabels(suggestion: CommanderSuggestionDTO): string[] {
+  return visibleKeywordSupport(suggestion).map((keyword) => keyword.keyword);
 }

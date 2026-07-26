@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { detectPairing } from '../src/services/partners';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
@@ -53,13 +52,36 @@ db.exec(`
     game_changer INTEGER DEFAULT 0,
     is_legendary INTEGER DEFAULT 0,
     is_commander_eligible INTEGER DEFAULT 0,
-    image_uri TEXT,
-    pairing_kind TEXT,
-    pairing_label TEXT
+    -- Partner-family ability (rule 702.124): one of 'partner', 'partner_with',
+    -- 'partner_suffix', 'friends_forever', 'choose_background',
+    -- 'doctors_companion', or NULL. partner_target holds the "partner with
+    -- [Name]" target name, or the "Partner—[text]" suffix, lowercased;
+    -- NULL for the other variants.
+    partner_ability TEXT,
+    partner_target TEXT,
+    -- A legendary Background enchantment (702.124m). Never itself a
+    -- solo/is_commander_eligible candidate — it only becomes a commander
+    -- paired with a "choose a Background" card.
+    is_background INTEGER DEFAULT 0,
+    image_uri TEXT
   );
   CREATE INDEX idx_cards_name_lower ON cards(name_lower);
   CREATE INDEX idx_cards_commander_eligible ON cards(is_commander_eligible);
-  CREATE INDEX idx_cards_pairing_kind ON cards(pairing_kind);
+  CREATE INDEX idx_cards_partner_ability ON cards(partner_ability);
+  CREATE INDEX idx_cards_is_background ON cards(is_background);
+
+  -- Lets a double-faced card be found by either face's name alone (e.g. a
+  -- pasted decklist naming just "Fable of the Mirror-Breaker", not the full
+  -- "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki"). Scoped to
+  -- true DFC layouts (transform, modal_dfc) — cards that are physically two
+  -- sides of one card — not split/adventure/flip cards, which share a
+  -- single face and are a different case.
+  DROP TABLE IF EXISTS card_face_names;
+  CREATE TABLE card_face_names (
+    face_name_lower TEXT NOT NULL,
+    oracle_id TEXT NOT NULL
+  );
+  CREATE INDEX idx_face_names_lower ON card_face_names(face_name_lower);
 `);
 
 function parseCreatureTypes(typeLine: string): string[] {
@@ -68,21 +90,68 @@ function parseCreatureTypes(typeLine: string): string[] {
   return afterDash.trim().split(/\s+/).filter(Boolean);
 }
 
+interface PartnerInfo {
+  ability: string | null;
+  target: string | null;
+}
+
+/** Strips a trailing reminder-text parenthetical and punctuation, lowercases. */
+function cleanTarget(raw: string): string {
+  return raw
+    .replace(/\(.*$/, '')
+    .replace(/[.\s]+$/, '')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Detects which Partner-family ability (702.124) a card has, from its own
+ * oracle text — Scryfall's structured `keywords` field flags some of these,
+ * but never the target name in "Partner with [Name]" or the suffix in
+ * "Partner—[text]", both of which only exist in the prose. Parsing text
+ * for all six keeps one consistent source of truth instead of two.
+ *
+ * Checked most-specific-first: "Partner with X" and "Partner—X" both
+ * contain the substring "partner", so plain Partner is only recognised
+ * once every more specific variant has been ruled out.
+ */
+function detectPartnerAbility(oracleText: string): PartnerInfo {
+  if (/doctor.s companion/i.test(oracleText)) return { ability: 'doctors_companion', target: null };
+  if (/choose a background/i.test(oracleText)) return { ability: 'choose_background', target: null };
+  if (/friends forever/i.test(oracleText)) return { ability: 'friends_forever', target: null };
+
+  const partnerWith = oracleText.match(/partner with ([^(\n]+)/i);
+  if (partnerWith) return { ability: 'partner_with', target: cleanTarget(partnerWith[1]) };
+
+  const partnerSuffix = oracleText.match(/partner[—–-]\s*([^(\n]+)/i);
+  if (partnerSuffix) return { ability: 'partner_suffix', target: cleanTarget(partnerSuffix[1]) };
+
+  if (/\bpartner\b/i.test(oracleText)) return { ability: 'partner', target: null };
+
+  return { ability: null, target: null };
+}
+
 const insert = db.prepare(`
   INSERT OR REPLACE INTO cards (
     oracle_id, name, name_lower, mana_cost, cmc, type_line, oracle_text,
     colors, color_identity, keywords, creature_types,
     power, toughness, scryfall_uri,
-    legality_commander, game_changer, is_legendary, is_commander_eligible, image_uri,
-    pairing_kind, pairing_label
+    legality_commander, game_changer, is_legendary, is_commander_eligible,
+    partner_ability, partner_target, is_background, image_uri
   ) VALUES (
     @oracle_id, @name, @name_lower, @mana_cost, @cmc, @type_line, @oracle_text,
     @colors, @color_identity, @keywords, @creature_types,
     @power, @toughness, @scryfall_uri,
-    @legality_commander, @game_changer, @is_legendary, @is_commander_eligible, @image_uri,
-    @pairing_kind, @pairing_label
+    @legality_commander, @game_changer, @is_legendary, @is_commander_eligible,
+    @partner_ability, @partner_target, @is_background, @image_uri
   )
 `);
+
+const insertFaceName = db.prepare(`
+  INSERT INTO card_face_names (face_name_lower, oracle_id) VALUES (?, ?)
+`);
+
+const DFC_LAYOUTS = new Set(['transform', 'modal_dfc']);
 
 let imported = 0;
 let skipped = 0;
@@ -107,14 +176,18 @@ const insertMany = db.transaction((rows: any[]) => {
       card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null;
 
     const isLegendary = typeLine.includes('Legendary') ? 1 : 0;
-    const isCreature = typeLine.includes('Creature');
+    // 903.3: a commander must be a creature, a Vehicle, or a Spacecraft (with
+    // a power/toughness box) — not only a creature. An unanimated Vehicle's
+    // type line is just "Artifact — Vehicle", no "Creature" in sight, so
+    // checking isCreature alone silently excluded every legal Vehicle and
+    // Spacecraft commander.
+    const isEligibleType =
+      typeLine.includes('Creature') || typeLine.includes('Vehicle') || typeLine.includes('Spacecraft');
     const mentionsCommander = /can be your commander/i.test(oracleText);
-    const isCommanderEligible = (isLegendary === 1 && isCreature) || mentionsCommander ? 1 : 0;
+    const isCommanderEligible = (isLegendary === 1 && isEligibleType) || mentionsCommander ? 1 : 0;
 
-    // Only legendary permanents can share a command zone, so checking the
-    // pairing text on anything else would just be a way to pick up false
-    // positives from cards that happen to use the same words.
-    const pairing = isLegendary === 1 ? detectPairing(typeLine, oracleText) : null;
+    const { ability: partnerAbility, target: partnerTarget } = detectPartnerAbility(oracleText);
+    const isBackground = typeLine.includes('Background') ? 1 : 0;
 
     insert.run({
       oracle_id: card.oracle_id,
@@ -137,11 +210,18 @@ const insertMany = db.transaction((rows: any[]) => {
       game_changer: card.game_changer ? 1 : 0,
       is_legendary: isLegendary,
       is_commander_eligible: isCommanderEligible,
+      partner_ability: partnerAbility,
+      partner_target: partnerTarget,
+      is_background: isBackground,
       image_uri: imageUri,
-      pairing_kind: pairing?.kind ?? null,
-      pairing_label: pairing?.label ?? null,
     });
     imported++;
+
+    if (DFC_LAYOUTS.has(card.layout) && Array.isArray(card.card_faces)) {
+      for (const face of card.card_faces as { name?: string }[]) {
+        if (face.name) insertFaceName.run(face.name.toLowerCase(), card.oracle_id);
+      }
+    }
   }
 });
 
@@ -160,18 +240,20 @@ const gameChangers = db
 console.log(`${eligible.c} cards are Commander-eligible.`);
 console.log(`${banned.c} cards are currently banned in Commander.`);
 console.log(`${gameChangers.c} cards are on the Game Changers list.`);
-
-const pairings = db
+const faceNames = db.prepare('SELECT COUNT(*) as c FROM card_face_names').get() as { c: number };
+console.log(`${faceNames.c} double-faced card face names indexed for single-side matching.`);
+const partnerCounts = db
   .prepare(
-    `SELECT pairing_kind AS kind, COUNT(*) AS c FROM cards
-     WHERE pairing_kind IS NOT NULL GROUP BY pairing_kind ORDER BY c DESC`
+    `SELECT partner_ability, COUNT(*) as c FROM cards WHERE partner_ability IS NOT NULL GROUP BY partner_ability`
   )
-  .all() as { kind: string; c: number }[];
-if (pairings.length > 0) {
-  console.log(`\nCommand-zone pairing mechanics detected:`);
-  for (const { kind, c } of pairings) {
-    console.log(`  ${kind}: ${c}`);
-  }
+  .all() as { partner_ability: string; c: number }[];
+if (partnerCounts.length > 0) {
+  console.log('Partner-family abilities found:');
+  for (const row of partnerCounts) console.log(`  ${row.partner_ability}: ${row.c}`);
 }
+const backgroundCount = db.prepare('SELECT COUNT(*) as c FROM cards WHERE is_background = 1').get() as {
+  c: number;
+};
+console.log(`${backgroundCount.c} legendary Background enchantments found.`);
 
 db.close();

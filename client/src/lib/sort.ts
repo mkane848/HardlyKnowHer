@@ -25,6 +25,16 @@ function compareIdentity(a: string[], b: string[]): number {
   return 0;
 }
 
+/** A unit's display name — one card's name, or both joined for a pair. */
+function unitName(suggestion: CommanderSuggestionDTO): string {
+  return suggestion.cards.map((c) => c.name).join(' + ');
+}
+
+/** A unit's total mana value — both halves' cost, for a Partner pair. */
+function unitManaValue(suggestion: CommanderSuggestionDTO): number {
+  return suggestion.cards.reduce((sum, c) => sum + (c.manaValue ?? 0), 0);
+}
+
 /**
  * Fewest colours first, WUBRG order within a colour count, then commander
  * name, then mana value as a last-resort tiebreaker (names are unique, so it
@@ -38,10 +48,10 @@ function compareByColorNameValue(a: CommanderSuggestionDTO, b: CommanderSuggesti
   const identityCmp = compareIdentity(a.colorIdentity, b.colorIdentity);
   if (identityCmp !== 0) return identityCmp;
 
-  const nameCmp = a.name.localeCompare(b.name);
+  const nameCmp = unitName(a).localeCompare(unitName(b));
   if (nameCmp !== 0) return nameCmp;
 
-  return (a.manaValue ?? 0) - (b.manaValue ?? 0);
+  return unitManaValue(a) - unitManaValue(b);
 }
 
 /**

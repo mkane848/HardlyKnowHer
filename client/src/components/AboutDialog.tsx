@@ -1,0 +1,77 @@
+import * as Dialog from '@radix-ui/react-dialog';
+import type { ReactNode } from 'react';
+
+const REPO_URL = 'https://github.com/mkane848/HardlyKnowHer';
+
+/**
+ * Version, credits, and a link to the source — the things a small hobby app
+ * owes its users without needing its own page for them. Reuses the same
+ * Dialog chrome (overlay/content/close styling) as the card detail view
+ * rather than inventing a second modal look.
+ */
+export function AboutDialog({ children }: { children: ReactNode }) {
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger asChild>{children}</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="dialog-overlay" />
+        <Dialog.Content className="dialog-content" aria-describedby={undefined}>
+          <div className="dialog-card about-dialog-card">
+            <div className="dialog-body">
+              <Dialog.Title className="dialog-name">Commander? I Hardly Know 'Er</Dialog.Title>
+              <p className="about-version">Version {__APP_VERSION__}</p>
+
+              <p className="about-blurb">
+                Paste a card list, get back Commander suggestions scored against it — with an explanation
+                for each one, not just a number.
+              </p>
+
+              <dl className="dialog-meta about-credits">
+                <div>
+                  <dt>Card &amp; legality data</dt>
+                  <dd>
+                    <a href="https://scryfall.com" target="_blank" rel="noreferrer noopener">
+                      Scryfall
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Combo data</dt>
+                  <dd>
+                    <a href="https://commanderspellbook.com" target="_blank" rel="noreferrer noopener">
+                      Commander Spellbook
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Built with</dt>
+                  <dd>Claude</dd>
+                </div>
+                <div>
+                  <dt>Source</dt>
+                  <dd>
+                    <a href={REPO_URL} target="_blank" rel="noreferrer noopener">
+                      github.com/mkane848/HardlyKnowHer
+                    </a>
+                  </dd>
+                </div>
+              </dl>
+
+              <p className="about-caveat">
+                Bracket estimates are a heuristic based on Game Changer count, not an official ruling — see the{' '}
+                <a href={`${REPO_URL}/blob/main/CHANGELOG.md`} target="_blank" rel="noreferrer noopener">
+                  changelog
+                </a>{' '}
+                for what's changed.
+              </p>
+            </div>
+          </div>
+
+          <Dialog.Close className="dialog-close" aria-label="Close">
+            <span aria-hidden="true">×</span>
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}

@@ -17,7 +17,7 @@ const PAGE_SIZE = 9;
 const EXPORT_FILENAME = 'commander-suggestions.txt';
 
 function toExportText(suggestions: CommanderSuggestionDTO[]): string {
-  return suggestions.map((s) => s.name).join('\n');
+  return suggestions.map((s) => s.cards.map((c) => c.name).join(' + ')).join('\n');
 }
 
 function downloadTextFile(filename: string, text: string) {
@@ -79,12 +79,12 @@ export function RecommendationResults() {
   // "not this one", filtering is "not right now". Both narrow the grid, but
   // the counts below report them separately so neither hides the other.
   const kept = useMemo(
-    () => suggestions.filter((s) => !dismissed.includes(s.oracleId)),
+    () => suggestions.filter((s) => !dismissed.includes(s.unitId)),
     [suggestions, dismissed]
   );
   const filtered = useMemo(() => applyFilters(kept, filters), [kept, filters]);
   const sorted = useMemo(() => sortSuggestions(filtered, sortMode), [filtered, sortMode]);
-  const { brackets, themes } = useMemo(() => availableFilterValues(kept), [kept]);
+  const { brackets, themes, hasColorless, hasMulticolor } = useMemo(() => availableFilterValues(kept), [kept]);
 
   // TanStack Table is used headlessly here, purely for the pagination state
   // machine — page bounds, and resetting to page 1 when filtering or sorting
@@ -92,7 +92,7 @@ export function RecommendationResults() {
   // plain functions in lib, since they cut across the whole row rather than
   // down one column.
   const columns = useMemo<ColumnDef<CommanderSuggestionDTO>[]>(
-    () => [{ id: 'suggestion', accessorKey: 'oracleId' }],
+    () => [{ id: 'suggestion', accessorKey: 'unitId' }],
     []
   );
 
@@ -154,6 +154,8 @@ export function RecommendationResults() {
             onChange={setFilters}
             availableBrackets={brackets}
             availableThemes={themes}
+            hasColorless={hasColorless}
+            hasMulticolor={hasMulticolor}
             sortMode={sortMode}
             onSortModeChange={setSortMode}
             shown={filtered.length}
@@ -177,7 +179,7 @@ export function RecommendationResults() {
             <>
               <div className="suggestion-grid">
                 {rows.map((row) => (
-                  <CommanderCard key={row.original.oracleId} suggestion={row.original} />
+                  <CommanderCard key={row.original.unitId} suggestion={row.original} />
                 ))}
               </div>
 

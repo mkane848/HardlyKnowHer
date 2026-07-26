@@ -87,7 +87,7 @@ async function main() {
         },
       });
 
-    const result = await findCombos('Grimgrin, Corpse-Born', ['Gravecrawler', 'Basalt Monolith', 'Rings of Brighthearth']);
+    const result = await findCombos(['Grimgrin, Corpse-Born'], ['Gravecrawler', 'Basalt Monolith', 'Rings of Brighthearth']);
     assert.strictEqual(result.ready.length, 1);
     assert.deepStrictEqual(result.ready[0].cards, ['Basalt Monolith', 'Rings of Brighthearth']);
     assert.deepStrictEqual(result.ready[0].produces, ['Infinite colorless mana']);
@@ -106,7 +106,7 @@ async function main() {
         },
       });
 
-    const result = await findCombos('Tymna', ["Thassa's Oracle", 'Demonic Consultation']);
+    const result = await findCombos(['Tymna'], ["Thassa's Oracle", 'Demonic Consultation']);
     assert.deepStrictEqual(result.ready[0].cards, ["Thassa's Oracle", 'Demonic Consultation']);
     assert.deepStrictEqual(result.ready[0].produces, ['Win the game']);
   });
@@ -116,7 +116,7 @@ async function main() {
     state.requests = [];
     state.handler = (_req, res) => json(res, 200, { results: { included: [], almostIncluded: [] } });
 
-    await findCombos('Grimgrin, Corpse-Born', ['Gravecrawler']);
+    await findCombos(['Grimgrin, Corpse-Born'], ['Gravecrawler']);
     const sent = state.requests[0];
     assert.match(sent.userAgent ?? '', /MtgCommanderRecommender/);
     assert.deepStrictEqual(sent.body, {
@@ -130,8 +130,8 @@ async function main() {
     state.requests = [];
     state.handler = (_req, res) => json(res, 200, { results: { included: [], almostIncluded: [] } });
 
-    const first = await findCombos('Grimgrin, Corpse-Born', ['Gravecrawler']);
-    const second = await findCombos('Grimgrin, Corpse-Born', ['Gravecrawler']);
+    const first = await findCombos(['Grimgrin, Corpse-Born'], ['Gravecrawler']);
+    const second = await findCombos(['Grimgrin, Corpse-Born'], ['Gravecrawler']);
     assert.strictEqual(first.cached, false);
     assert.strictEqual(second.cached, true);
     assert.strictEqual(state.requests.length, 1, 'expected exactly one upstream request');
@@ -142,10 +142,10 @@ async function main() {
     state.requests = [];
     state.handler = (_req, res) => json(res, 200, { results: { included: [], almostIncluded: [] } });
 
-    await findCombos('Grimgrin', ['A', 'B']);
-    const reordered = await findCombos('Grimgrin', ['B', 'A']);
+    await findCombos(['Grimgrin'], ['A', 'B']);
+    const reordered = await findCombos(['Grimgrin'], ['B', 'A']);
     assert.strictEqual(reordered.cached, true, 'reordered list should hit cache');
-    const different = await findCombos('Grimgrin', ['A', 'C']);
+    const different = await findCombos(['Grimgrin'], ['A', 'C']);
     assert.strictEqual(different.cached, false, 'different list should miss cache');
     assert.strictEqual(state.requests.length, 2);
   });
@@ -160,7 +160,7 @@ async function main() {
     };
 
     await assert.rejects(
-      () => findCombos('Grimgrin', ['Gravecrawler']),
+      () => findCombos(['Grimgrin'], ['Gravecrawler']),
       (err: unknown) => {
         assert.ok(err instanceof SpellbookError);
         assert.strictEqual(err.status, 429);
@@ -176,7 +176,7 @@ async function main() {
     state.handler = (_req, res) => json(res, 400, { detail: 'commanders field is required' });
 
     await assert.rejects(
-      () => findCombos('Grimgrin', ['Gravecrawler']),
+      () => findCombos(['Grimgrin'], ['Gravecrawler']),
       (err: unknown) => {
         assert.ok(err instanceof SpellbookError);
         assert.match(err.message, /commanders field is required/);
@@ -189,10 +189,10 @@ async function main() {
     clearComboCache();
     state.requests = [];
     state.handler = (_req, res) => json(res, 500, { detail: 'boom' });
-    await assert.rejects(() => findCombos('Grimgrin', ['Gravecrawler']));
+    await assert.rejects(() => findCombos(['Grimgrin'], ['Gravecrawler']));
 
     state.handler = (_req, res) => json(res, 200, { results: { included: [], almostIncluded: [] } });
-    const retry = await findCombos('Grimgrin', ['Gravecrawler']);
+    const retry = await findCombos(['Grimgrin'], ['Gravecrawler']);
     assert.strictEqual(retry.cached, false);
     assert.strictEqual(state.requests.length, 2);
   });

@@ -66,19 +66,44 @@ body {
     max(4rem, calc(env(safe-area-inset-bottom) + 2rem)) max(1.5rem, env(safe-area-inset-left));
 }
 
+.app-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+.app-nav-brand {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+  color: var(--brass-bright);
+}
+
+.app-nav-link {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.app-nav-link:hover {
+  border-color: var(--brass);
+}
+
 .app-header {
   border-bottom: 1px solid var(--ink-border);
   padding-bottom: 2rem;
   margin-bottom: 2.5rem;
-}
-
-.app-eyebrow {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.75rem;
-  color: var(--brass-bright);
-  margin: 0 0 0.75rem;
 }
 
 .app-title {
@@ -122,6 +147,37 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-muted);
+}
+
+.upload-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.upload-collapsed-summary {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.upload-collapse-toggle .explain-chevron {
+  margin-left: auto;
+  color: var(--brass);
+  font-size: 0.65rem;
+}
+
+.upload-collapsible {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
 }
 
 .upload-textarea {
@@ -551,6 +607,48 @@ body {
 
 .commander-art-trigger:hover .commander-image {
   transform: scale(1.03);
+}
+
+/* A Partner/Background pair shows both cards' art side by side rather than
+   picking one to represent the unit — neither card outranks the other
+   (702.124e). */
+.commander-image-row {
+  display: flex;
+}
+
+.commander-image-row .commander-art-trigger {
+  width: 50%;
+  /* Only the row's own outer corners round; a raw 14px on every trigger
+     would round both inner edges too, leaving a visible gap at the seam. */
+  border-radius: 0;
+}
+
+.commander-image-row .commander-art-trigger:first-child {
+  border-radius: 14px 0 0 0;
+}
+
+.commander-image-row .commander-art-trigger:last-child {
+  border-radius: 0 14px 0 0;
+}
+
+.commander-image-row .commander-image {
+  width: 100%;
+  aspect-ratio: 5 / 6;
+}
+
+/* One card's name/type/rules-text block within a commander unit. A solo
+   commander has one; a pair stacks two, separated by a rule so it reads as
+   two distinct cards rather than one confused card. */
+.commander-face {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.commander-face + .commander-face {
+  margin-top: 0.4rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--parchment-dim);
 }
 
 .commander-body {
@@ -1213,6 +1311,47 @@ body {
   color: var(--pip-r);
 }
 
+/* About dialog */
+
+.about-dialog-card {
+  /* No art strip like the card-detail dialog, so the body starts at the top. */
+  display: block;
+}
+
+.about-version {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-text-muted);
+  margin: 0.2rem 0 0;
+}
+
+.about-blurb {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin: 0.9rem 0 0;
+}
+
+.about-credits {
+  margin-top: 1rem;
+}
+
+.about-credits a {
+  color: #7a5615;
+}
+
+.about-caveat {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ink-text-muted);
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--parchment-dim);
+}
+
+.about-caveat a {
+  color: #7a5615;
+}
+
 /* On the image dialog the close button overlays the card art rather than a
    parchment panel, so it needs its own contrast to stay readable. */
 .card-image-close {
@@ -1228,6 +1367,11 @@ body {
 }
 
 /* Combo lookup */
+
+.combo-button-row {
+  display: flex;
+  gap: 0.5rem;
+}
 
 .combo-button {
   align-self: flex-start;
@@ -1245,6 +1389,17 @@ body {
 
 .combo-button:hover {
   background: var(--brass);
+}
+
+.combo-button-placeholder {
+  background: transparent;
+  color: var(--ink-text-muted);
+  border: 1px dashed var(--parchment-dim);
+  cursor: not-allowed;
+}
+
+.combo-button-placeholder:hover {
+  background: transparent;
 }
 
 .combo-error {

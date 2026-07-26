@@ -1,5 +1,5 @@
 import type { CardRow } from '../types';
-import { canPair, combineIdentity, type Pairing, type PairingKind } from './partners';
+import type { CommanderUnit } from './partners';
 
 export interface OwnedCard {
   row: CardRow;
@@ -10,10 +10,12 @@ export interface CollectionProfile {
   colorCounts: Record<string, number>;
   creatureTypeCounts: Record<string, number>;
   themeCounts: Record<string, number>;
+  keywordCounts: Record<string, number>;
   // Which cards produced each signal, so a suggestion can show its work
   // rather than just a count.
   themeCards: Record<string, OwnedCard[]>;
   creatureTypeCards: Record<string, OwnedCard[]>;
+  keywordCards: Record<string, OwnedCard[]>;
   totalCards: number;
 }
 
@@ -29,7 +31,7 @@ export interface SupportingCard {
   scryfallUri: string | null;
 }
 
-/** A theme the commander shares with the list, and the cards behind it. */
+/** A theme (or archetype — see ARCHETYPES below) the commander shares with the list. */
 export interface ThemeSupport {
   key: string;
   label: string;
@@ -43,102 +45,24 @@ export interface TribeSupport {
   cards: SupportingCard[];
 }
 
+/** A keyword ability (e.g. Flying, Deathtouch) the commander shares with the list. */
+export interface KeywordSupport {
+  keyword: string;
+  cards: SupportingCard[];
+}
+
 export interface CommanderSuggestion {
-  card: CardRow;
+  cards: CardRow[];
   score: number;
   matchedThemes: string[];
   matchedCreatureTypes: string[];
+  matchedKeywords: string[];
   includedCardCount: number;
   themeSupport: ThemeSupport[];
   tribeSupport: TribeSupport[];
+  keywordSupport: KeywordSupport[];
   gameChangerCards: SupportingCard[];
 }
-
-// Simple oracle-text theme detection. This is deliberately a short, readable
-// list rather than an exhaustive taxonomy — it's meant to be easy to extend
-// by hand as you notice themes it's missing, not to be a complete model of
-// Magic strategy. `description` is user-facing: it explains what the theme
-// means when a suggestion is expanded.
-const THEMES: { key: string; label: string; description: string; pattern: RegExp }[] = [
-  {
-    key: 'sacrifice',
-    label: 'Sacrifice',
-    description: 'Cards that sacrifice creatures or other permanents for value.',
-    pattern: /sacrifice/i,
-  },
-  {
-    key: 'graveyard',
-    label: 'Graveyard',
-    description: 'Cards that treat the graveyard as a resource rather than a dead zone.',
-    pattern: /graveyard/i,
-  },
-  {
-    key: 'counters',
-    label: '+1/+1 Counters',
-    description: 'Cards that place +1/+1 counters or care about them.',
-    pattern: /\+1\/\+1 counter/i,
-  },
-  {
-    key: 'tokens',
-    label: 'Tokens',
-    description: 'Cards that create tokens, giving you bodies to attack or sacrifice with.',
-    pattern: /create[^.]*token/i,
-  },
-  {
-    key: 'artifacts',
-    label: 'Artifacts',
-    description: 'Artifacts and the cards that care about them.',
-    pattern: /artifact/i,
-  },
-  {
-    key: 'enchantments',
-    label: 'Enchantments',
-    description: 'Enchantments and the cards that care about them.',
-    pattern: /enchantment/i,
-  },
-  {
-    key: 'spellslinger',
-    label: 'Instants & Sorceries',
-    description: 'Payoffs for casting instants and sorceries.',
-    pattern: /instant or sorcery spell|whenever you cast an? (instant|sorcery)/i,
-  },
-  {
-    key: 'lifegain',
-    label: 'Lifegain',
-    description: 'Cards that gain life, or that trigger when you do.',
-    pattern: /gain(s|ed)? \d*\s*life|whenever you gain life/i,
-  },
-  {
-    key: 'draw',
-    label: 'Card Draw',
-    description: 'Cards that refill your hand.',
-    pattern: /draw (a|two|three|\d+) cards?/i,
-  },
-  {
-    key: 'mill',
-    label: 'Mill',
-    description: 'Cards that move cards from a library into a graveyard.',
-    pattern: /mills? (a|\d)|into (their|your) graveyard from (their|your) library/i,
-  },
-  {
-    key: 'aristocrats',
-    label: 'Death Triggers',
-    description: 'Cards that trigger when a creature dies, turning losses into value.',
-    pattern: /whenever .* (dies|died)/i,
-  },
-  {
-    key: 'landfall',
-    label: 'Landfall',
-    description: 'Cards that trigger when a land enters the battlefield.',
-    pattern: /landfall|whenever a land enters/i,
-  },
-  {
-    key: 'reanimation',
-    label: 'Reanimation',
-    description: 'Cards that return creatures from the graveyard to the battlefield.',
-    pattern: /return .* from your graveyard to the battlefield/i,
-  },
-];
 
 function parseJsonArray(value: string | null): string[] {
   if (!value) return [];
@@ -149,6 +73,171 @@ function parseJsonArray(value: string | null): string[] {
     return [];
   }
 }
+
+interface ThemeDef {
+  key: string;
+  label: string;
+  description: string;
+  /** Any one of these matching the text counts as the theme being present. */
+  patterns: RegExp[];
+}
+
+function theme(key: string, label: string, description: string, ...patterns: RegExp[]): ThemeDef {
+  return { key, label, description, patterns };
+}
+
+function matchesTheme(theme: ThemeDef, text: string): boolean {
+  return theme.patterns.some((pattern) => pattern.test(text));
+}
+
+// Simple oracle-text theme detection. This is deliberately a short, readable
+// list rather than an exhaustive taxonomy — it's meant to be easy to extend
+// by hand as you notice themes it's missing, not to be a complete model of
+// Magic strategy. `description` is user-facing: it explains what the theme
+// means when a suggestion is expanded.
+const THEMES: ThemeDef[] = [
+  theme('sacrifice', 'Sacrifice', 'Cards that sacrifice creatures or other permanents for value.', /sacrifice/i),
+  theme(
+    'graveyard',
+    'Graveyard',
+    'Cards that treat the graveyard as a resource rather than a dead zone.',
+    /graveyard/i
+  ),
+  theme('counters', '+1/+1 Counters', 'Cards that place +1/+1 counters or care about them.', /\+1\/\+1 counter/i),
+  theme(
+    'tokens',
+    'Tokens',
+    'Cards that create tokens, giving you bodies to attack or sacrifice with.',
+    /create[^.]*token/i
+  ),
+  theme('artifacts', 'Artifacts', 'Artifacts and the cards that care about them.', /artifact/i),
+  theme('enchantments', 'Enchantments', 'Enchantments and the cards that care about them.', /enchantment/i),
+  theme(
+    'planeswalkers',
+    'Planeswalkers',
+    'Planeswalkers, and cards that protect or take advantage of having them.',
+    /planeswalkers? you control/i,
+    /whenever a planeswalker (enters|you control)/i
+  ),
+  theme(
+    'equipment',
+    'Equipment',
+    'Equipment, and cards that care about equipping creatures.',
+    // No trailing \b: real text includes "Equip {2}" (the keyword ability),
+    // "Equipment", and "Equipped creatures you control" (the payoff side) —
+    // a trailing boundary would reject "Equipped" right after matching "equip".
+    /\bequip/i
+  ),
+  theme(
+    'auras',
+    'Auras',
+    'Auras, and cards that care about enchanting creatures.',
+    /\baura\b/i,
+    /enchant creature/i
+  ),
+  theme(
+    // Spellslinger is the real name for this archetype, not a generic
+    // description — kept as one theme rather than a separate archetype
+    // layer, since it already was that archetype under a blander label.
+    'spellslinger',
+    'Spellslinger',
+    'Payoffs for casting instants and sorceries — the deck that wants to chain spells, not creatures.',
+    /instant or sorcery spell/i,
+    /whenever you cast an? (instant|sorcery)/i,
+    /whenever you cast a noncreature spell/i,
+    /instant and sorcery spells? (you cast )?costs? \{?\d/i
+  ),
+  theme('lifegain', 'Lifegain', 'Cards that gain life, or that trigger when you do.', /gain(s|ed)? \d*\s*life/i, /whenever you gain life/i),
+  theme('draw', 'Card Draw', 'Cards that refill your hand.', /draw (a|two|three|\d+) cards?/i),
+  theme(
+    'mill',
+    'Mill',
+    'Cards that move cards from a library into a graveyard.',
+    /mills? (a|\d)/i,
+    /into (their|your) graveyard from (their|your) library/i
+  ),
+  theme(
+    'deathTriggers',
+    'Death Triggers',
+    'Cards that trigger when a creature dies, turning losses into value.',
+    /whenever .* (dies|died)/i
+  ),
+  theme('landfall', 'Landfall', 'Cards that trigger when a land enters the battlefield.', /landfall/i, /whenever a land enters/i),
+  theme(
+    'reanimation',
+    'Reanimation',
+    'Cards that return creatures from the graveyard to the battlefield.',
+    /return .* from your graveyard to the battlefield/i
+  ),
+  theme(
+    'doublers',
+    'Doublers & Multipliers',
+    'Cards that double tokens, counters, or card draw, make triggers happen twice, or copy spells.',
+    /would create (one or more )?tokens?[^.]*instead/i,
+    /create twice (that many|as many) tokens/i,
+    /would (put|distribute) one or more .*counters[^.]*instead/i,
+    /twice that many .*counters/i,
+    /would draw (a card|cards)[^.]*instead draw/i,
+    /draws? an additional card/i,
+    /triggers? an additional time/i,
+    /copy (it\.|that spell|the (target|next) instant or sorcery)/i
+  ),
+];
+
+// Keyword abilities that drive the "shared keywords" / "X matters" signal —
+// e.g. a pile of Flying creatures suggesting a commander that also flies and
+// cares about it. Sourced from Scryfall's `keywords` field per card, which is
+// otherwise unused in this file.
+//
+// The Partner-family abilities are deliberately excluded: they're also
+// surfaced in `keywords`, but they mean something structural (who can be your
+// commander), not a thematic signal — showing "Partner" as a generic shared
+// keyword tag would be a confusing echo of the dedicated partner/background
+// handling, not a second, unrelated theme.
+const EXCLUDED_KEYWORDS = new Set([
+  'partner',
+  'partner with',
+  'friends forever',
+  'choose a background',
+  "doctor's companion",
+]);
+
+interface ArchetypeDef {
+  key: string;
+  label: string;
+  description: string;
+  /** Component theme keys this archetype is built from. */
+  componentKeys: string[];
+  /** How many of componentKeys must be satisfied for the archetype to apply. */
+  minComponents: number;
+}
+
+// Archetypes are a named label for a *combination* of the themes above — the
+// individual themes still show up on their own, but seeing "Aristocrats" as
+// one line is more useful than inferring it from "Sacrifice, Death Triggers,
+// Tokens" separately. Like everything else here, a candidate must show the
+// same signals in its own text as the list does; see the note on Voltron
+// below for what that costs.
+const ARCHETYPES: ArchetypeDef[] = [
+  {
+    key: 'aristocrats',
+    label: 'Aristocrats',
+    description:
+      'Sacrifice fodder for repeated death triggers, turning your own creatures dying into value or damage.',
+    componentKeys: ['sacrifice', 'deathTriggers', 'tokens'],
+    minComponents: 2,
+  },
+  {
+    key: 'voltron',
+    label: 'Voltron',
+    description:
+      "Stack Equipment and Auras onto one threat — often the commander — and win through a single hard-to-answer creature." +
+      ' Only flags commanders whose own text engages with equipping or enchanting; a great Voltron target that never' +
+      ' mentions either (evasive stats alone) will not be caught by this heuristic.',
+    componentKeys: ['equipment', 'auras'],
+    minComponents: 1,
+  },
+];
 
 function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
   return {
@@ -161,18 +250,20 @@ function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
   };
 }
 
-/** Reads the pairing mechanic stored on a row at import time. */
-export function pairingOf(row: CardRow): Pairing | null {
-  if (!row.pairing_kind) return null;
-  return { kind: row.pairing_kind as PairingKind, label: row.pairing_label ?? null };
+function dedupeCards(cards: SupportingCard[]): SupportingCard[] {
+  const seen = new Map<string, SupportingCard>();
+  for (const card of cards) seen.set(card.name, card);
+  return [...seen.values()];
 }
 
 export function buildCollectionProfile(owned: OwnedCard[]): CollectionProfile {
   const colorCounts: Record<string, number> = {};
   const creatureTypeCounts: Record<string, number> = {};
   const themeCounts: Record<string, number> = {};
+  const keywordCounts: Record<string, number> = {};
   const themeCards: Record<string, OwnedCard[]> = {};
   const creatureTypeCards: Record<string, OwnedCard[]> = {};
+  const keywordCards: Record<string, OwnedCard[]> = {};
   let totalCards = 0;
 
   for (const entry of owned) {
@@ -188,26 +279,77 @@ export function buildCollectionProfile(owned: OwnedCard[]): CollectionProfile {
       (creatureTypeCards[type] ??= []).push(entry);
     }
 
+    for (const keyword of parseJsonArray(row.keywords)) {
+      if (EXCLUDED_KEYWORDS.has(keyword.toLowerCase())) continue;
+      keywordCounts[keyword] = (keywordCounts[keyword] ?? 0) + quantity;
+      (keywordCards[keyword] ??= []).push(entry);
+    }
+
     const text = row.oracle_text ?? '';
-    for (const theme of THEMES) {
-      if (theme.pattern.test(text)) {
-        themeCounts[theme.key] = (themeCounts[theme.key] ?? 0) + quantity;
-        (themeCards[theme.key] ??= []).push(entry);
+    for (const def of THEMES) {
+      if (matchesTheme(def, text)) {
+        themeCounts[def.key] = (themeCounts[def.key] ?? 0) + quantity;
+        (themeCards[def.key] ??= []).push(entry);
       }
     }
   }
 
-  return { colorCounts, creatureTypeCounts, themeCounts, themeCards, creatureTypeCards, totalCards };
+  return {
+    colorCounts,
+    creatureTypeCounts,
+    themeCounts,
+    keywordCounts,
+    themeCards,
+    creatureTypeCards,
+    keywordCards,
+    totalCards,
+  };
 }
 
-const MIN_SIGNAL_COUNT = 2; // require a theme/tribe to show up at least twice to count as a real signal
+// A commander unit is jointly "the commander" (702.124e) — every signal below
+// is unioned across both cards in a pair rather than checked per-card, so a
+// Partner pair matches anything either half of it would match solo.
+function unitColorIdentity(unit: CommanderUnit): Set<string> {
+  const set = new Set<string>();
+  for (const card of unit.cards) {
+    for (const c of parseJsonArray(card.color_identity)) set.add(c);
+  }
+  return set;
+}
+
+function unitCreatureTypes(unit: CommanderUnit): string[] {
+  const set = new Set<string>();
+  for (const card of unit.cards) {
+    for (const t of parseJsonArray(card.creature_types)) set.add(t);
+  }
+  return [...set];
+}
+
+function unitKeywords(unit: CommanderUnit): string[] {
+  const set = new Set<string>();
+  for (const card of unit.cards) {
+    for (const k of parseJsonArray(card.keywords)) {
+      if (!EXCLUDED_KEYWORDS.has(k.toLowerCase())) set.add(k);
+    }
+  }
+  return [...set];
+}
+
+// Joined rather than checked separately: a theme pattern needs to match
+// *either* card's text, and testing a regex against the concatenation gives
+// exactly that without a second matchesTheme call per card.
+function unitOracleText(unit: CommanderUnit): string {
+  return unit.cards.map((c) => c.oracle_text ?? '').join('\n');
+}
+
+const MIN_SIGNAL_COUNT = 2; // require a theme/tribe/keyword to show up at least twice to count as a real signal
 
 /**
  * Scores each candidate commander against the collection profile.
  * A candidate needs a non-zero color-identity overlap with the uploaded
- * cards AND at least one tribal or thematic signal to be suggested —
- * this keeps the list from filling up with technically-legal but
- * meaningless matches.
+ * cards AND at least one tribal, keyword, or thematic signal to be
+ * suggested — this keeps the list from filling up with technically-legal
+ * but meaningless matches.
  *
  * Alongside the score, each suggestion carries the cards behind every
  * signal it matched. Only cards that actually fit the commander's colour
@@ -215,14 +357,14 @@ const MIN_SIGNAL_COUNT = 2; // require a theme/tribe to show up at least twice t
  * commander is not a reason to pick it.
  */
 export function scoreCommanders(
-  candidates: CardRow[],
+  units: CommanderUnit[],
   profile: CollectionProfile,
   owned: OwnedCard[]
 ): CommanderSuggestion[] {
   const suggestions: CommanderSuggestion[] = [];
 
-  for (const candidate of candidates) {
-    const identitySet = new Set(parseJsonArray(candidate.color_identity));
+  for (const unit of units) {
+    const identitySet = unitColorIdentity(unit);
     const fitsIdentity = ({ row }: OwnedCard) =>
       parseJsonArray(row.color_identity).every((c) => identitySet.has(c));
 
@@ -232,29 +374,62 @@ export function scoreCommanders(
     }
     if (includedCardCount === 0) continue;
 
-    const candidateTypes = parseJsonArray(candidate.creature_types);
+    const candidateTypes = unitCreatureTypes(unit);
     const matchedCreatureTypes = candidateTypes.filter(
       (t) => (profile.creatureTypeCounts[t] ?? 0) >= MIN_SIGNAL_COUNT
     );
 
-    const candidateText = candidate.oracle_text ?? '';
-    const matchedThemeDefs = THEMES.filter(
-      (theme) =>
-        (profile.themeCounts[theme.key] ?? 0) >= MIN_SIGNAL_COUNT && theme.pattern.test(candidateText)
+    const candidateKeywords = unitKeywords(unit);
+    const matchedKeywords = candidateKeywords.filter(
+      (k) => (profile.keywordCounts[k] ?? 0) >= MIN_SIGNAL_COUNT
     );
 
-    if (matchedCreatureTypes.length === 0 && matchedThemeDefs.length === 0) continue;
+    const candidateText = unitOracleText(unit);
+    const matchedThemeDefs = THEMES.filter(
+      (def) => (profile.themeCounts[def.key] ?? 0) >= MIN_SIGNAL_COUNT && matchesTheme(def, candidateText)
+    );
+    const matchedThemeKeys = new Set(matchedThemeDefs.map((d) => d.key));
 
-    const themeSupport: ThemeSupport[] = matchedThemeDefs.map((theme) => ({
-      key: theme.key,
-      label: theme.label,
-      description: theme.description,
-      cards: (profile.themeCards[theme.key] ?? []).filter(fitsIdentity).map(toSupportingCard),
-    }));
+    const matchedArchetypes = ARCHETYPES.filter(
+      (arch) => arch.componentKeys.filter((k) => matchedThemeKeys.has(k)).length >= arch.minComponents
+    );
+
+    if (
+      matchedCreatureTypes.length === 0 &&
+      matchedThemeDefs.length === 0 &&
+      matchedKeywords.length === 0 &&
+      matchedArchetypes.length === 0
+    ) {
+      continue;
+    }
+
+    const themeSupport: ThemeSupport[] = [
+      ...matchedArchetypes.map((arch) => ({
+        key: arch.key,
+        label: arch.label,
+        description: arch.description,
+        cards: dedupeCards(
+          arch.componentKeys
+            .filter((k) => matchedThemeKeys.has(k))
+            .flatMap((k) => (profile.themeCards[k] ?? []).filter(fitsIdentity).map(toSupportingCard))
+        ),
+      })),
+      ...matchedThemeDefs.map((def) => ({
+        key: def.key,
+        label: def.label,
+        description: def.description,
+        cards: (profile.themeCards[def.key] ?? []).filter(fitsIdentity).map(toSupportingCard),
+      })),
+    ];
 
     const tribeSupport: TribeSupport[] = matchedCreatureTypes.map((type) => ({
       type,
       cards: (profile.creatureTypeCards[type] ?? []).filter(fitsIdentity).map(toSupportingCard),
+    }));
+
+    const keywordSupport: KeywordSupport[] = matchedKeywords.map((keyword) => ({
+      keyword,
+      cards: (profile.keywordCards[keyword] ?? []).filter(fitsIdentity).map(toSupportingCard),
     }));
 
     const gameChangerCards = owned
@@ -262,113 +437,27 @@ export function scoreCommanders(
       .map(toSupportingCard);
 
     const coverageRatio = includedCardCount / Math.max(profile.totalCards, 1);
-    const score = coverageRatio * 50 + matchedCreatureTypes.length * 15 + matchedThemeDefs.length * 10;
+    const score =
+      coverageRatio * 50 +
+      matchedCreatureTypes.length * 15 +
+      matchedThemeDefs.length * 10 +
+      matchedKeywords.length * 8 +
+      matchedArchetypes.length * 20;
 
     suggestions.push({
-      card: candidate,
+      cards: unit.cards,
       score,
-      matchedThemes: matchedThemeDefs.map((t) => t.label),
+      matchedThemes: [...matchedArchetypes.map((a) => a.label), ...matchedThemeDefs.map((t) => t.label)],
       matchedCreatureTypes,
+      matchedKeywords,
       includedCardCount,
       themeSupport,
       tribeSupport,
+      keywordSupport,
       gameChangerCards,
     });
   }
 
   suggestions.sort((a, b) => b.score - a.score);
   return suggestions;
-}
-
-/** A legal second commander, and what pairing with it would unlock. */
-export interface PartnerOption {
-  oracleId: string;
-  name: string;
-  imageUri: string | null;
-  scryfallUri: string | null;
-  typeLine: string | null;
-  manaCost: string | null;
-  colorIdentity: string[];
-  /** The pairing mechanic on the partner's side. */
-  mechanic: PairingKind;
-  /** Colour identity of the pair — the union of both halves. */
-  combinedIdentity: string[];
-  /** Cards from the list playable under the pair. */
-  combinedCardCount: number;
-  /** How many more than the commander alone allows. */
-  addedCardCount: number;
-}
-
-/**
- * Counts the owned cards playable under a colour identity, memoised across
- * calls — most partner options resolve to one of a handful of combined
- * identities, so the same count is asked for many times over.
- */
-function countOwnedFitting(owned: OwnedCard[], identity: string[], memo: Map<string, number>): number {
-  const key = [...identity].sort().join('');
-  const cached = memo.get(key);
-  if (cached !== undefined) return cached;
-
-  const allowed = new Set(identity);
-  let total = 0;
-  for (const entry of owned) {
-    if (parseJsonArray(entry.row.color_identity).every((c) => allowed.has(c))) {
-      total += entry.quantity;
-    }
-  }
-
-  memo.set(key, total);
-  return total;
-}
-
-/**
- * Finds second commanders that could legally join this one, ranked by how
- * much of the user's list the pair unlocks.
- *
- * The ranking is the whole point of surfacing these: a second commander
- * widens the deck's colour identity, so the interesting question isn't
- * "who can pair with this?" but "which pairing lets me actually play more of
- * what I own?". Ties break on name so the order is stable between requests.
- */
-export function buildPartnerOptions(
-  suggestion: CommanderSuggestion,
-  pairables: CardRow[],
-  owned: OwnedCard[],
-  memo: Map<string, number>,
-  limit = 4
-): PartnerOption[] {
-  const pairing = pairingOf(suggestion.card);
-  if (!pairing) return [];
-
-  const self = { name: suggestion.card.name, pairing };
-  const options: PartnerOption[] = [];
-
-  for (const candidate of pairables) {
-    const candidatePairing = pairingOf(candidate);
-    if (!candidatePairing) continue;
-    if (!canPair(self, { name: candidate.name, pairing: candidatePairing })) continue;
-
-    const combinedIdentity = combineIdentity(
-      parseJsonArray(suggestion.card.color_identity),
-      parseJsonArray(candidate.color_identity)
-    );
-    const combinedCardCount = countOwnedFitting(owned, combinedIdentity, memo);
-
-    options.push({
-      oracleId: candidate.oracle_id,
-      name: candidate.name,
-      imageUri: candidate.image_uri,
-      scryfallUri: candidate.scryfall_uri,
-      typeLine: candidate.type_line,
-      manaCost: candidate.mana_cost,
-      colorIdentity: parseJsonArray(candidate.color_identity),
-      mechanic: candidatePairing.kind,
-      combinedIdentity,
-      combinedCardCount,
-      addedCardCount: combinedCardCount - suggestion.includedCardCount,
-    });
-  }
-
-  options.sort((a, b) => b.addedCardCount - a.addedCardCount || a.name.localeCompare(b.name));
-  return options.slice(0, limit);
 }

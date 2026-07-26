@@ -1,14 +1,8 @@
 import { Router } from 'express';
-import { isSeeded, findCardsByNames, getCommanderCandidates, getPairableCards } from '../db';
+import { isSeeded, findCardsByNames, getCommanderCandidates, getBackgroundCards } from '../db';
 import { parseCardList } from '../services/parseList';
-import {
-  buildCollectionProfile,
-  buildPartnerOptions,
-  pairingOf,
-  scoreCommanders,
-  type OwnedCard,
-} from '../services/synergy';
-import { PAIRING_LABELS } from '../services/partners';
+import { buildCollectionProfile, scoreCommanders, type OwnedCard } from '../services/synergy';
+import { buildCommanderUnits, unitKey } from '../services/partners';
 import { estimateBracket } from '../services/bracket';
 
 const router = Router();
@@ -62,46 +56,45 @@ router.post('/recommend', (req, res) => {
 
   const profile = buildCollectionProfile(owned);
   const candidates = getCommanderCandidates();
-  const scored = scoreCommanders(candidates, profile, owned).slice(0, MAX_SUGGESTIONS);
-
-  // Partner options are only worked out for the slice actually being sent,
-  // and share one memo so the repeated "how much of the list fits this
-  // colour identity?" question is answered once per distinct identity.
-  const pairables = getPairableCards();
-  const identityCountMemo = new Map<string, number>();
+  const backgrounds = getBackgroundCards();
+  const units = buildCommanderUnits(candidates, backgrounds);
+  const scored = scoreCommanders(units, profile, owned).slice(0, MAX_SUGGESTIONS);
 
   const suggestions = scored.map((s) => {
-    // The commander itself counts toward the Bracket alongside any Game
-    // Changers in the list that fit its colour identity.
-    const gameChangerCount = (s.card.game_changer ? 1 : 0) + s.gameChangerCards.length;
-    const pairing = pairingOf(s.card);
+    // Every card in the unit counts toward the Bracket, alongside any Game
+    // Changers in the list that fit its colour identity — a Partner pair is
+    // jointly "the commander" (702.124e), so both halves' own status matters.
+    const gameChangerCount = s.cards.filter((c) => c.game_changer).length + s.gameChangerCards.length;
+    const colorIdentity = [...new Set(s.cards.flatMap((c) => parseJsonArray(c.color_identity)))];
 
     return {
-      oracleId: s.card.oracle_id,
-      name: s.card.name,
-      imageUri: s.card.image_uri,
-      colorIdentity: parseJsonArray(s.card.color_identity),
-      typeLine: s.card.type_line,
-      oracleText: s.card.oracle_text,
-      manaCost: s.card.mana_cost,
-      manaValue: s.card.cmc,
-      power: s.card.power,
-      toughness: s.card.toughness,
-      scryfallUri: s.card.scryfall_uri,
+      unitId: unitKey(s),
+      cards: s.cards.map((c) => ({
+        oracleId: c.oracle_id,
+        name: c.name,
+        imageUri: c.image_uri,
+        colorIdentity: parseJsonArray(c.color_identity),
+        typeLine: c.type_line,
+        oracleText: c.oracle_text,
+        manaCost: c.mana_cost,
+        manaValue: c.cmc,
+        power: c.power,
+        toughness: c.toughness,
+        scryfallUri: c.scryfall_uri,
+        isGameChanger: !!c.game_changer,
+      })),
+      colorIdentity,
       score: Math.round(s.score),
       matchedThemes: s.matchedThemes,
       matchedCreatureTypes: s.matchedCreatureTypes,
+      matchedKeywords: s.matchedKeywords,
       includedCardCount: s.includedCardCount,
       themeSupport: s.themeSupport,
       tribeSupport: s.tribeSupport,
+      keywordSupport: s.keywordSupport,
       gameChangerCards: s.gameChangerCards,
       gameChangerCount,
-      isGameChanger: !!s.card.game_changer,
       bracket: estimateBracket(gameChangerCount),
-      pairing: pairing
-        ? { kind: pairing.kind, label: pairing.label, mechanicName: PAIRING_LABELS[pairing.kind] }
-        : null,
-      partnerOptions: pairing ? buildPartnerOptions(s, pairables, owned, identityCountMemo) : [],
     };
   });
 

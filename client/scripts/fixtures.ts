@@ -1,4 +1,6 @@
-import type { CommanderSuggestionDTO, SupportingCardDTO } from '../src/types';
+import type { CommanderCardDTO, CommanderSuggestionDTO, SupportingCardDTO } from '../src/types';
+
+let counter = 0;
 
 /** A supporting card, for tests that only care about its name/quantity. */
 export function makeSupportingCard(overrides: Partial<SupportingCardDTO> = {}): SupportingCardDTO {
@@ -13,12 +15,12 @@ export function makeSupportingCard(overrides: Partial<SupportingCardDTO> = {}): 
   };
 }
 
-/** A minimally-filled suggestion, so each test only has to spell out the
- * fields it actually cares about. */
-export function makeSuggestion(overrides: Partial<CommanderSuggestionDTO> = {}): CommanderSuggestionDTO {
+/** One card of a commander unit, for tests that build a suggestion by hand. */
+export function makeCommanderCard(overrides: Partial<CommanderCardDTO> = {}): CommanderCardDTO {
+  const name = overrides.name ?? `Test Commander ${counter++}`;
   return {
-    oracleId: overrides.name ?? 'oracle-id',
-    name: 'Test Commander',
+    oracleId: name,
+    name,
     imageUri: null,
     colorIdentity: [],
     typeLine: null,
@@ -28,18 +30,31 @@ export function makeSuggestion(overrides: Partial<CommanderSuggestionDTO> = {}):
     power: null,
     toughness: null,
     scryfallUri: null,
+    isGameChanger: false,
+    ...overrides,
+  };
+}
+
+/** A minimally-filled, single-card suggestion, so each test only has to
+ * spell out the fields it actually cares about. Pass `cards` directly to
+ * test a Partner/Background pair instead of the default solo unit. */
+export function makeSuggestion(overrides: Partial<CommanderSuggestionDTO> = {}): CommanderSuggestionDTO {
+  const cards = overrides.cards ?? [makeCommanderCard()];
+  return {
+    unitId: cards.map((c) => c.oracleId).join('+'),
+    cards,
+    colorIdentity: [],
     score: 0,
     matchedThemes: [],
     matchedCreatureTypes: [],
+    matchedKeywords: [],
     includedCardCount: 0,
     themeSupport: [],
     tribeSupport: [],
+    keywordSupport: [],
     gameChangerCards: [],
     gameChangerCount: 0,
-    isGameChanger: false,
     bracket: { label: 'Exhibition / Core', range: 'Bracket 1–2', note: '' },
-    pairing: null,
-    partnerOptions: [],
     ...overrides,
   };
 }

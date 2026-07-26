@@ -4,24 +4,12 @@ import { CardDetailDialog } from './CardDetailDialog';
 import { CardImageDialog } from './CardImageDialog';
 import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
-import { visibleThemeSupport, visibleTribeSupport } from '../lib/suggestions';
+import { visibleKeywordSupport, visibleThemeSupport, visibleTribeSupport } from '../lib/suggestions';
 import { ManaSymbol } from './ManaSymbol';
-import type { CommanderSuggestionDTO, PartnerOptionDTO, SupportingCardDTO } from '../types';
+import type { BracketEstimateDTO, CommanderCardDTO, CommanderSuggestionDTO, SupportingCardDTO } from '../types';
 
 function cardCount(cards: SupportingCardDTO[]): number {
   return cards.reduce((sum, card) => sum + card.quantity, 0);
-}
-
-/** Pips for a colour identity, falling back to the colorless pip. */
-function IdentityPips({ colors }: { colors: string[] }) {
-  if (colors.length === 0) return <ManaSymbol color="C" decorative />;
-  return (
-    <>
-      {sortWubrg(colors).map((color) => (
-        <ManaSymbol key={color} color={color} decorative />
-      ))}
-    </>
-  );
 }
 
 function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
@@ -49,58 +37,25 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
   );
 }
 
-/**
- * Second commanders this one could share the command zone with.
- *
- * Ranked by how much of the list each pairing unlocks, because that is the
- * practical reason to care: a second commander widens the deck's colour
- * identity, and the useful question is which pairing lets you play more of
- * what you already own.
- */
-function PartnerOptions({ options }: { options: PartnerOptionDTO[] }) {
+/** One face's own art, opening a whole-card image preview when tapped. */
+function CommanderArt({ card }: { card: CommanderCardDTO }) {
+  if (!card.imageUri) return null;
   return (
-    <ul className="partner-list">
-      {options.map((option) => (
-        <li key={option.oracleId} className="partner-item">
-          <CardImageDialog
-            name={option.name}
-            imageUri={option.imageUri}
-            scryfallUri={option.scryfallUri}
-          >
-            <button type="button" className="partner-name" aria-label={`Show the card ${option.name}`}>
-              {option.name}
-            </button>
-          </CardImageDialog>
-
-          <span className="partner-meta">
-            <span className="partner-pips">
-              <IdentityPips colors={option.combinedIdentity} />
-            </span>
-            <span className="partner-identity">{identityName(option.combinedIdentity)}</span>
-            {option.addedCardCount > 0 && (
-              <span className="partner-gain">+{option.addedCardCount} cards</span>
-            )}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
+      <button type="button" className="commander-art-trigger" aria-label={`Show the full card for ${card.name}`}>
+        <img className="commander-image" src={card.imageUri} alt={card.name} loading="lazy" />
+      </button>
+    </CardImageDialog>
   );
 }
 
-export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
-  const [expanded, setExpanded] = useState(false);
-  const detailsId = useId();
-  const dismiss = useAppStore((s) => s.dismiss);
-
-  // Themes/tribes the collection profile matched globally can still end up
-  // with zero cards once narrowed to ones that fit this commander's colour
-  // identity — that's not a real reason to suggest it, so it's filtered out
-  // here rather than shown as an empty group.
-  const tribeSupport = visibleTribeSupport(suggestion);
-  const themeSupport = visibleThemeSupport(suggestion);
-  const tribeTypes = tribeSupport.map((t) => t.type);
-  const themeLabels = themeSupport.map((t) => t.label);
-
+/**
+ * One card's own name, type line and rules text within a commander unit.
+ * A solo commander renders one of these; a Partner/Background pair renders
+ * two, one per card — each is jointly "the commander" (702.124e), so neither
+ * gets top billing over the other.
+ */
+function CommanderFace({ card, bracket }: { card: CommanderCardDTO; bracket: BracketEstimateDTO }) {
   // Whether the clamped rules text is actually cut off, so "Read more" only
   // appears when there is more to read. Measured rather than guessed from
   // character count: how many lines an ability takes depends on the column
@@ -119,45 +74,78 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [suggestion.oracleText]);
+  }, [card.oracleText]);
 
-  const partnerOptions = suggestion.partnerOptions ?? [];
+  return (
+    <div className="commander-face">
+      <h3 className="commander-name">{card.name}</h3>
+      {card.typeLine && <p className="commander-type">{card.typeLine}</p>}
+
+      {/* Rules text in a card's own reading order: name, types, then the
+          text box. Clamped so one wordy commander can't dominate the grid,
+          and tappable at any length to open the full card. */}
+      {card.oracleText && (
+        <CardDetailDialog card={card} bracket={bracket}>
+          <button type="button" className="commander-oracle-button" aria-label={`Show the full card for ${card.name}`}>
+            <span ref={oracleRef} className="commander-oracle">
+              {card.oracleText}
+            </span>
+            {isClamped && <span className="oracle-more">Read more</span>}
+          </button>
+        </CardDetailDialog>
+      )}
+    </div>
+  );
+}
+
+export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
+  const dismiss = useAppStore((s) => s.dismiss);
+
+  const displayName = suggestion.cards.map((c) => c.name).join(' + ');
+  const isGameChanger = suggestion.cards.some((c) => c.isGameChanger);
+  const isPair = suggestion.cards.length > 1;
+
+  // Themes/tribes/keywords the collection profile matched globally can still
+  // end up with zero cards once narrowed to ones that fit this commander's
+  // colour identity — that's not a real reason to suggest it, so it's
+  // filtered out here rather than shown as an empty group.
+  const tribeSupport = visibleTribeSupport(suggestion);
+  const themeSupport = visibleThemeSupport(suggestion);
+  const keywordSupport = visibleKeywordSupport(suggestion);
+  const tribeTypes = tribeSupport.map((t) => t.type);
+  const themeLabels = themeSupport.map((t) => t.label);
+  const keywordLabels = keywordSupport.map((k) => k.keyword);
+
   const hasReasons =
     themeSupport.length > 0 ||
     tribeSupport.length > 0 ||
-    suggestion.gameChangerCards.length > 0 ||
-    partnerOptions.length > 0;
+    keywordSupport.length > 0 ||
+    suggestion.gameChangerCards.length > 0;
 
   return (
-    <article className={`commander-card${expanded ? ' is-expanded' : ''}`}>
-      {suggestion.imageUri && (
-        <CardImageDialog
-          name={suggestion.name}
-          imageUri={suggestion.imageUri}
-          scryfallUri={suggestion.scryfallUri}
-        >
-          <button
-            type="button"
-            className="commander-art-trigger"
-            aria-label={`Show the full card for ${suggestion.name}`}
-          >
-            <img className="commander-image" src={suggestion.imageUri} alt={suggestion.name} loading="lazy" />
-          </button>
-        </CardImageDialog>
+    <article className={`commander-card${expanded ? ' is-expanded' : ''}${isPair ? ' is-pair' : ''}`}>
+      {isPair ? (
+        <div className="commander-image-row">
+          {suggestion.cards.map((card) => (
+            <CommanderArt key={card.oracleId} card={card} />
+          ))}
+        </div>
+      ) : (
+        <CommanderArt card={suggestion.cards[0]} />
       )}
       <button
         type="button"
         className="dismiss-button"
-        onClick={() => dismiss(suggestion.oracleId)}
-        aria-label={`Dismiss ${suggestion.name}`}
+        onClick={() => dismiss(suggestion.unitId)}
+        aria-label={`Dismiss ${displayName}`}
         title="Dismiss this suggestion"
       >
         <span aria-hidden="true">×</span>
       </button>
 
       <div className="commander-body">
-        <h3 className="commander-name">{suggestion.name}</h3>
-
         <div className="pip-row">
           {suggestion.colorIdentity.length === 0 ? (
             <ManaSymbol color="C" />
@@ -167,44 +155,13 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
           <span className="identity-name">{identityName(suggestion.colorIdentity)}</span>
         </div>
 
-        {suggestion.typeLine && <p className="commander-type">{suggestion.typeLine}</p>}
-
-        {/* Rules text in a card's own reading order: name, types, then the
-            text box. Clamped so one wordy commander can't dominate the grid,
-            and tappable at any length to open the full card. */}
-        {suggestion.oracleText && (
-          <CardDetailDialog suggestion={suggestion}>
-            <button
-              type="button"
-              className="commander-oracle-button"
-              aria-label={`Show the full card for ${suggestion.name}`}
-            >
-              <span ref={oracleRef} className="commander-oracle">
-                {suggestion.oracleText}
-              </span>
-              {isClamped && <span className="oracle-more">Read more</span>}
-            </button>
-          </CardDetailDialog>
-        )}
+        {suggestion.cards.map((card) => (
+          <CommanderFace key={card.oracleId} card={card} bracket={suggestion.bracket} />
+        ))}
 
         <div className="badge-row">
           <span className="badge badge-bracket">{suggestion.bracket.range}</span>
-          {suggestion.isGameChanger && <span className="badge badge-gc">Game Changer</span>}
-          {suggestion.pairing && (
-            <span
-              className="badge badge-pairing"
-              title={
-                suggestion.pairing.label
-                  ? `${suggestion.pairing.mechanicName} ${suggestion.pairing.label}`
-                  : `${suggestion.pairing.mechanicName} — can share the command zone`
-              }
-            >
-              {suggestion.pairing.mechanicName}
-              {suggestion.pairing.kind === 'partner-with' && suggestion.pairing.label
-                ? ` ${suggestion.pairing.label}`
-                : ''}
-            </span>
-          )}
+          {isGameChanger && <span className="badge badge-gc">Game Changer</span>}
         </div>
 
         <p className="commander-meta">
@@ -219,6 +176,11 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
         {themeLabels.length > 0 && (
           <p className="commander-tags">
             <span className="commander-tags-label">Themes</span> {themeLabels.join(', ')}
+          </p>
+        )}
+        {keywordLabels.length > 0 && (
+          <p className="commander-tags">
+            <span className="commander-tags-label">Keywords</span> {keywordLabels.join(', ')}
           </p>
         )}
 
@@ -275,14 +237,21 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
               </section>
             )}
 
-            {partnerOptions.length > 0 && suggestion.pairing && (
+            {keywordSupport.length > 0 && (
               <section className="explain-section">
-                <h4 className="explain-heading">Second commander</h4>
-                <p className="explain-group-desc">
-                  {suggestion.pairing.mechanicName} lets this share the command zone. These pairings
-                  are ranked by how much more of your list each one opens up.
-                </p>
-                <PartnerOptions options={partnerOptions} />
+                <h4 className="explain-heading">Shared keywords</h4>
+                {keywordSupport.map((kw) => (
+                  <div key={kw.keyword} className="explain-group">
+                    <p className="explain-group-title">
+                      {kw.keyword} <span className="explain-count">{cardCount(kw.cards)} in your list</span>
+                    </p>
+                    <p className="explain-group-desc">
+                      This commander has {kw.keyword}, and enough of your list does too for it to be a real pattern,
+                      not a coincidence.
+                    </p>
+                    <SupportingCardList cards={kw.cards} />
+                  </div>
+                ))}
               </section>
             )}
 
@@ -296,11 +265,11 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
               </section>
             )}
 
-            <ComboFinder commanderName={suggestion.name} />
+            <ComboFinder commanderNames={suggestion.cards.map((c) => c.name)} />
 
             <p className="explain-caveat">
-              Matches come from card text and creature types, not a model of how the deck actually plays.
-              Treat this as a starting point.
+              Matches come from card text, keywords, and creature types, not a model of how the deck actually
+              plays. Treat this as a starting point.
             </p>
           </div>
         )}

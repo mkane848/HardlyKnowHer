@@ -14,30 +14,6 @@ export interface SupportingCardDTO {
   scryfallUri: string | null;
 }
 
-/** A command-zone pairing mechanic: Partner, Choose a Background, etc. */
-export interface PairingDTO {
-  kind: string;
-  /** The card named by "Partner with", or the "Partner — X" group label. */
-  label: string | null;
-  /** Display name of the mechanic, e.g. "Choose a Background". */
-  mechanicName: string;
-}
-
-/** A legal second commander, and what pairing with it would unlock. */
-export interface PartnerOptionDTO {
-  oracleId: string;
-  name: string;
-  imageUri: string | null;
-  scryfallUri: string | null;
-  typeLine: string | null;
-  manaCost: string | null;
-  colorIdentity: string[];
-  mechanic: string;
-  combinedIdentity: string[];
-  combinedCardCount: number;
-  addedCardCount: number;
-}
-
 export interface ThemeSupportDTO {
   key: string;
   label: string;
@@ -50,7 +26,13 @@ export interface TribeSupportDTO {
   cards: SupportingCardDTO[];
 }
 
-export interface CommanderSuggestionDTO {
+export interface KeywordSupportDTO {
+  keyword: string;
+  cards: SupportingCardDTO[];
+}
+
+/** One card of a commander unit — a solo commander has one, a Partner/Background pair has two. */
+export interface CommanderCardDTO {
   oracleId: string;
   name: string;
   imageUri: string | null;
@@ -62,19 +44,25 @@ export interface CommanderSuggestionDTO {
   power: string | null;
   toughness: string | null;
   scryfallUri: string | null;
+  isGameChanger: boolean;
+}
+
+export interface CommanderSuggestionDTO {
+  /** Stable id for the unit (both cards' oracle ids, sorted and joined) — use this, not a card's own oracleId, as the row key. */
+  unitId: string;
+  cards: CommanderCardDTO[];
+  colorIdentity: string[];
   score: number;
   matchedThemes: string[];
   matchedCreatureTypes: string[];
+  matchedKeywords: string[];
   includedCardCount: number;
   themeSupport: ThemeSupportDTO[];
   tribeSupport: TribeSupportDTO[];
+  keywordSupport: KeywordSupportDTO[];
   gameChangerCards: SupportingCardDTO[];
   gameChangerCount: number;
-  isGameChanger: boolean;
   bracket: BracketEstimateDTO;
-  /** Non-null when this commander can share the command zone with another card. */
-  pairing: PairingDTO | null;
-  partnerOptions: PartnerOptionDTO[];
 }
 
 export interface ComboDTO {

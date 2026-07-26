@@ -53,10 +53,10 @@ function ComboList({ combos, showMissing }: { combos: ComboDTO[]; showMissing?: 
  * current contents, so editing the box after getting results doesn't quietly
  * ask about a different deck than the one on screen.
  */
-export function ComboFinder({ commanderName }: { commanderName: string }) {
+export function ComboFinder({ commanderNames }: { commanderNames: string[] }) {
   const submittedList = useAppStore((s) => s.submittedList);
   const [requested, setRequested] = useState(false);
-  const { data, error, isFetching, refetch } = useCombos(commanderName, submittedList, requested);
+  const { data, error, isFetching, refetch } = useCombos(commanderNames, submittedList, requested);
 
   // `data` is served from cache even while disabled, so collapsing this panel
   // and reopening it shows the previous answer instead of asking again.
@@ -73,9 +73,19 @@ export function ComboFinder({ commanderName }: { commanderName: string }) {
             Check Commander Spellbook for combos between this commander and the cards in your list that
             fit its colour identity.
           </p>
-          <button type="button" className="combo-button" onClick={() => setRequested(true)}>
-            Find combos
-          </button>
+          <div className="combo-button-row">
+            <button type="button" className="combo-button" onClick={() => setRequested(true)}>
+              Find combos
+            </button>
+            {/* Placeholder only — no request is made and no EDHREC data is
+                fetched. EDHREC access is still an open question (see
+                handoff.md); this just reserves the spot in the UI for a
+                future one-time, click-to-run lookup matching how the combo
+                button above works. */}
+            <button type="button" className="combo-button combo-button-placeholder" disabled title="Coming soon">
+              EDHRec
+            </button>
+          </div>
         </>
       )}
 
