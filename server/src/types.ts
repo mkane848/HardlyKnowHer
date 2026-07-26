@@ -17,6 +17,23 @@ export interface CardRow {
   power: string | null; // string, not number — can be "*" or "1+*"
   toughness: string | null;
   scryfall_uri: string | null;
+  // Partner-family ability (rule 702.124), detected from oracle text at
+  // import time. See services/partners.ts for how these combine into pairs.
+  partner_ability:
+    | 'partner'
+    | 'partner_with'
+    | 'partner_suffix'
+    | 'friends_forever'
+    | 'choose_background'
+    | 'doctors_companion'
+    | null;
+  // "partner with [Name]"'s target name, or "Partner—[text]"'s suffix —
+  // both lowercased. Null for every other ability (including plain partner).
+  partner_target: string | null;
+  // A legendary Background enchantment (702.124m) — never itself
+  // is_commander_eligible; only ever a commander paired via
+  // "choose a Background".
+  is_background: number; // 0 | 1
   legality_commander: string; // "legal" | "banned" | "not_legal" | "restricted"
   game_changer: number; // 0 | 1
   is_legendary: number; // 0 | 1

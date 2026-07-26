@@ -515,6 +515,33 @@ body {
   object-position: top;
 }
 
+/* A Partner/Background pair shows both cards' art side by side rather than
+   picking one to represent the unit — neither card outranks the other
+   (702.124e). */
+.commander-image-row {
+  display: flex;
+}
+
+.commander-image-row .commander-image {
+  width: 50%;
+  aspect-ratio: 5 / 6;
+}
+
+/* One card's name/type/rules-text block within a commander unit. A solo
+   commander has one; a pair stacks two, separated by a rule so it reads as
+   two distinct cards rather than one confused card. */
+.commander-face {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.commander-face + .commander-face {
+  margin-top: 0.4rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--parchment-dim);
+}
+
 .commander-body {
   padding: 1.1rem;
   display: flex;
@@ -1037,6 +1064,11 @@ body {
 
 /* Combo lookup */
 
+.combo-button-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .combo-button {
   align-self: flex-start;
   font-family: var(--font-body);
@@ -1053,6 +1085,17 @@ body {
 
 .combo-button:hover {
   background: var(--brass);
+}
+
+.combo-button-placeholder {
+  background: transparent;
+  color: var(--ink-text-muted);
+  border: 1px dashed var(--parchment-dim);
+  cursor: not-allowed;
+}
+
+.combo-button-placeholder:hover {
+  background: transparent;
 }
 
 .combo-error {

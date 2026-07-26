@@ -20,6 +20,11 @@ function tableExists(name: string): boolean {
   return !!row;
 }
 
+function columnExists(table: string, column: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  return columns.some((c) => c.name === column);
+}
+
 // True once `npm run import-scryfall` has been run at least once.
 // Routes check this so they can return a helpful message instead of a
 // confusing SQL error when the database is still empty.
@@ -58,6 +63,22 @@ export function getCommanderCandidates(): CardRow[] {
   return db
     .prepare(
       `SELECT * FROM cards WHERE is_commander_eligible = 1 AND legality_commander = 'legal'`
+    )
+    .all() as CardRow[];
+}
+
+// is_background is newer than `cards` itself, same story as card_face_names
+// above: guard it so a database seeded before Partner/Background support
+// existed degrades to "no Backgrounds available" instead of crashing the
+// server when this statement is first prepared.
+const hasBackgroundColumn = columnExists('cards', 'is_background');
+
+/** Legal, legendary Background enchantments — pairing targets for "choose a Background", never a candidate on their own. */
+export function getBackgroundCards(): CardRow[] {
+  if (!hasBackgroundColumn) return [];
+  return db
+    .prepare(
+      `SELECT * FROM cards WHERE is_background = 1 AND is_legendary = 1 AND legality_commander = 'legal'`
     )
     .all() as CardRow[];
 }

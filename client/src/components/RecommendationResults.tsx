@@ -28,7 +28,7 @@ export function RecommendationResults() {
   // "not this one", filtering is "not right now". Both narrow the grid, but
   // the counts below report them separately so neither hides the other.
   const kept = useMemo(
-    () => suggestions.filter((s) => !dismissed.includes(s.oracleId)),
+    () => suggestions.filter((s) => !dismissed.includes(s.unitId)),
     [suggestions, dismissed]
   );
   const filtered = useMemo(() => applyFilters(kept, filters), [kept, filters]);
@@ -39,7 +39,7 @@ export function RecommendationResults() {
   // row count under you. Filtering itself stays a plain function in lib, since
   // these filters cut across the whole row rather than down one column.
   const columns = useMemo<ColumnDef<CommanderSuggestionDTO>[]>(
-    () => [{ id: 'suggestion', accessorKey: 'oracleId' }],
+    () => [{ id: 'suggestion', accessorKey: 'unitId' }],
     []
   );
 
@@ -123,7 +123,7 @@ export function RecommendationResults() {
             <>
               <div className="suggestion-grid">
                 {rows.map((row) => (
-                  <CommanderCard key={row.original.oracleId} suggestion={row.original} />
+                  <CommanderCard key={row.original.unitId} suggestion={row.original} />
                 ))}
               </div>
 

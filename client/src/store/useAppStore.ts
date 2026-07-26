@@ -14,12 +14,12 @@ interface AppState {
   rawList: string;
   /** The list actually submitted — the key everything server-side hangs off. */
   submittedList: string;
-  /** oracleIds the user has dismissed from the current results. */
+  /** unitIds the user has dismissed from the current results. */
   dismissed: string[];
   setRawList: (text: string) => void;
   submitList: (text: string) => void;
-  dismiss: (oracleId: string) => void;
-  restore: (oracleId: string) => void;
+  dismiss: (unitId: string) => void;
+  restore: (unitId: string) => void;
   restoreAll: () => void;
 }
 
@@ -39,12 +39,12 @@ export const useAppStore = create<AppState>((set) => ({
       dismissed: submittedList === state.submittedList ? state.dismissed : [],
     })),
 
-  dismiss: (oracleId) =>
+  dismiss: (unitId) =>
     set((state) => ({
-      dismissed: state.dismissed.includes(oracleId) ? state.dismissed : [...state.dismissed, oracleId],
+      dismissed: state.dismissed.includes(unitId) ? state.dismissed : [...state.dismissed, unitId],
     })),
 
-  restore: (oracleId) => set((state) => ({ dismissed: state.dismissed.filter((id) => id !== oracleId) })),
+  restore: (unitId) => set((state) => ({ dismissed: state.dismissed.filter((id) => id !== unitId) })),
 
   restoreAll: () => set({ dismissed: [] }),
 }));

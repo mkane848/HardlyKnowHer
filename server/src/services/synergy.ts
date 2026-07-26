@@ -1,4 +1,5 @@
 import type { CardRow } from '../types';
+import type { CommanderUnit } from './partners';
 
 export interface OwnedCard {
   row: CardRow;
@@ -47,7 +48,7 @@ export interface KeywordSupport {
 }
 
 export interface CommanderSuggestion {
-  card: CardRow;
+  cards: CardRow[];
   score: number;
   matchedThemes: string[];
   matchedCreatureTypes: string[];
@@ -299,6 +300,42 @@ export function buildCollectionProfile(owned: OwnedCard[]): CollectionProfile {
   };
 }
 
+// A commander unit is jointly "the commander" (702.124e) — every signal below
+// is unioned across both cards in a pair rather than checked per-card, so a
+// Partner pair matches anything either half of it would match solo.
+function unitColorIdentity(unit: CommanderUnit): Set<string> {
+  const set = new Set<string>();
+  for (const card of unit.cards) {
+    for (const c of parseJsonArray(card.color_identity)) set.add(c);
+  }
+  return set;
+}
+
+function unitCreatureTypes(unit: CommanderUnit): string[] {
+  const set = new Set<string>();
+  for (const card of unit.cards) {
+    for (const t of parseJsonArray(card.creature_types)) set.add(t);
+  }
+  return [...set];
+}
+
+function unitKeywords(unit: CommanderUnit): string[] {
+  const set = new Set<string>();
+  for (const card of unit.cards) {
+    for (const k of parseJsonArray(card.keywords)) {
+      if (!EXCLUDED_KEYWORDS.has(k.toLowerCase())) set.add(k);
+    }
+  }
+  return [...set];
+}
+
+// Joined rather than checked separately: a theme pattern needs to match
+// *either* card's text, and testing a regex against the concatenation gives
+// exactly that without a second matchesTheme call per card.
+function unitOracleText(unit: CommanderUnit): string {
+  return unit.cards.map((c) => c.oracle_text ?? '').join('\n');
+}
+
 const MIN_SIGNAL_COUNT = 2; // require a theme/tribe/keyword to show up at least twice to count as a real signal
 
 /**
@@ -314,14 +351,14 @@ const MIN_SIGNAL_COUNT = 2; // require a theme/tribe/keyword to show up at least
  * commander is not a reason to pick it.
  */
 export function scoreCommanders(
-  candidates: CardRow[],
+  units: CommanderUnit[],
   profile: CollectionProfile,
   owned: OwnedCard[]
 ): CommanderSuggestion[] {
   const suggestions: CommanderSuggestion[] = [];
 
-  for (const candidate of candidates) {
-    const identitySet = new Set(parseJsonArray(candidate.color_identity));
+  for (const unit of units) {
+    const identitySet = unitColorIdentity(unit);
     const fitsIdentity = ({ row }: OwnedCard) =>
       parseJsonArray(row.color_identity).every((c) => identitySet.has(c));
 
@@ -331,19 +368,17 @@ export function scoreCommanders(
     }
     if (includedCardCount === 0) continue;
 
-    const candidateTypes = parseJsonArray(candidate.creature_types);
+    const candidateTypes = unitCreatureTypes(unit);
     const matchedCreatureTypes = candidateTypes.filter(
       (t) => (profile.creatureTypeCounts[t] ?? 0) >= MIN_SIGNAL_COUNT
     );
 
-    const candidateKeywords = parseJsonArray(candidate.keywords).filter(
-      (k) => !EXCLUDED_KEYWORDS.has(k.toLowerCase())
-    );
+    const candidateKeywords = unitKeywords(unit);
     const matchedKeywords = candidateKeywords.filter(
       (k) => (profile.keywordCounts[k] ?? 0) >= MIN_SIGNAL_COUNT
     );
 
-    const candidateText = candidate.oracle_text ?? '';
+    const candidateText = unitOracleText(unit);
     const matchedThemeDefs = THEMES.filter(
       (def) => (profile.themeCounts[def.key] ?? 0) >= MIN_SIGNAL_COUNT && matchesTheme(def, candidateText)
     );
@@ -404,7 +439,7 @@ export function scoreCommanders(
       matchedArchetypes.length * 20;
 
     suggestions.push({
-      card: candidate,
+      cards: unit.cards,
       score,
       matchedThemes: [...matchedArchetypes.map((a) => a.label), ...matchedThemeDefs.map((t) => t.label)],
       matchedCreatureTypes,

@@ -29,7 +29,8 @@ export interface KeywordSupportDTO {
   cards: SupportingCardDTO[];
 }
 
-export interface CommanderSuggestionDTO {
+/** One card of a commander unit — a solo commander has one, a Partner/Background pair has two. */
+export interface CommanderCardDTO {
   oracleId: string;
   name: string;
   imageUri: string | null;
@@ -40,6 +41,14 @@ export interface CommanderSuggestionDTO {
   power: string | null;
   toughness: string | null;
   scryfallUri: string | null;
+  isGameChanger: boolean;
+}
+
+export interface CommanderSuggestionDTO {
+  /** Stable id for the unit (both cards' oracle ids, sorted and joined) — use this, not a card's own oracleId, as the row key. */
+  unitId: string;
+  cards: CommanderCardDTO[];
+  colorIdentity: string[];
   score: number;
   matchedThemes: string[];
   matchedCreatureTypes: string[];
@@ -50,7 +59,6 @@ export interface CommanderSuggestionDTO {
   keywordSupport: KeywordSupportDTO[];
   gameChangerCards: SupportingCardDTO[];
   gameChangerCount: number;
-  isGameChanger: boolean;
   bracket: BracketEstimateDTO;
 }
 

@@ -4,7 +4,7 @@ import { CardDetailDialog } from './CardDetailDialog';
 import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
 import { ManaSymbol } from './ManaSymbol';
-import type { CommanderSuggestionDTO, SupportingCardDTO } from '../types';
+import type { BracketEstimateDTO, CommanderCardDTO, CommanderSuggestionDTO, SupportingCardDTO } from '../types';
 
 function cardCount(cards: SupportingCardDTO[]): number {
   return cards.reduce((sum, card) => sum + card.quantity, 0);
@@ -28,11 +28,13 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
   );
 }
 
-export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
-  const [expanded, setExpanded] = useState(false);
-  const detailsId = useId();
-  const dismiss = useAppStore((s) => s.dismiss);
-
+/**
+ * One card's own name, type line and rules text within a commander unit.
+ * A solo commander renders one of these; a Partner/Background pair renders
+ * two, one per card — each is jointly "the commander" (702.124e), so neither
+ * gets top billing over the other.
+ */
+function CommanderFace({ card, bracket }: { card: CommanderCardDTO; bracket: BracketEstimateDTO }) {
   // Whether the clamped rules text is actually cut off, so "Read more" only
   // appears when there is more to read. Measured rather than guessed from
   // character count: how many lines an ability takes depends on the column
@@ -51,7 +53,37 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [suggestion.oracleText]);
+  }, [card.oracleText]);
+
+  return (
+    <div className="commander-face">
+      <h3 className="commander-name">{card.name}</h3>
+      {card.typeLine && <p className="commander-type">{card.typeLine}</p>}
+
+      {/* Rules text in a card's own reading order: name, types, then the
+          text box. Clamped so one wordy commander can't dominate the grid,
+          and tappable at any length to open the full card. */}
+      {card.oracleText && (
+        <CardDetailDialog card={card} bracket={bracket}>
+          <button type="button" className="commander-oracle-button" aria-label={`Show the full card for ${card.name}`}>
+            <span ref={oracleRef} className="commander-oracle">
+              {card.oracleText}
+            </span>
+            {isClamped && <span className="oracle-more">Read more</span>}
+          </button>
+        </CardDetailDialog>
+      )}
+    </div>
+  );
+}
+
+export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
+  const dismiss = useAppStore((s) => s.dismiss);
+
+  const displayName = suggestion.cards.map((c) => c.name).join(' + ');
+  const isGameChanger = suggestion.cards.some((c) => c.isGameChanger);
 
   const hasReasons =
     suggestion.themeSupport.length > 0 ||
@@ -59,24 +91,40 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
     suggestion.keywordSupport.length > 0 ||
     suggestion.gameChangerCards.length > 0;
 
+  const isPair = suggestion.cards.length > 1;
+
   return (
-    <article className={`commander-card${expanded ? ' is-expanded' : ''}`}>
-      {suggestion.imageUri && (
-        <img className="commander-image" src={suggestion.imageUri} alt={suggestion.name} loading="lazy" />
+    <article className={`commander-card${expanded ? ' is-expanded' : ''}${isPair ? ' is-pair' : ''}`}>
+      {isPair ? (
+        <div className="commander-image-row">
+          {suggestion.cards.map(
+            (card) =>
+              card.imageUri && (
+                <img key={card.oracleId} className="commander-image" src={card.imageUri} alt={card.name} loading="lazy" />
+              )
+          )}
+        </div>
+      ) : (
+        suggestion.cards[0].imageUri && (
+          <img
+            className="commander-image"
+            src={suggestion.cards[0].imageUri}
+            alt={suggestion.cards[0].name}
+            loading="lazy"
+          />
+        )
       )}
       <button
         type="button"
         className="dismiss-button"
-        onClick={() => dismiss(suggestion.oracleId)}
-        aria-label={`Dismiss ${suggestion.name}`}
+        onClick={() => dismiss(suggestion.unitId)}
+        aria-label={`Dismiss ${displayName}`}
         title="Dismiss this suggestion"
       >
         <span aria-hidden="true">×</span>
       </button>
 
       <div className="commander-body">
-        <h3 className="commander-name">{suggestion.name}</h3>
-
         <div className="pip-row">
           {suggestion.colorIdentity.length === 0 ? (
             <ManaSymbol color="C" />
@@ -86,29 +134,13 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
           <span className="identity-name">{identityName(suggestion.colorIdentity)}</span>
         </div>
 
-        {suggestion.typeLine && <p className="commander-type">{suggestion.typeLine}</p>}
-
-        {/* Rules text in a card's own reading order: name, types, then the
-            text box. Clamped so one wordy commander can't dominate the grid,
-            and tappable at any length to open the full card. */}
-        {suggestion.oracleText && (
-          <CardDetailDialog suggestion={suggestion}>
-            <button
-              type="button"
-              className="commander-oracle-button"
-              aria-label={`Show the full card for ${suggestion.name}`}
-            >
-              <span ref={oracleRef} className="commander-oracle">
-                {suggestion.oracleText}
-              </span>
-              {isClamped && <span className="oracle-more">Read more</span>}
-            </button>
-          </CardDetailDialog>
-        )}
+        {suggestion.cards.map((card) => (
+          <CommanderFace key={card.oracleId} card={card} bracket={suggestion.bracket} />
+        ))}
 
         <div className="badge-row">
           <span className="badge badge-bracket">{suggestion.bracket.range}</span>
-          {suggestion.isGameChanger && <span className="badge badge-gc">Game Changer</span>}
+          {isGameChanger && <span className="badge badge-gc">Game Changer</span>}
         </div>
 
         <p className="commander-meta">
@@ -212,7 +244,7 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
               </section>
             )}
 
-            <ComboFinder commanderName={suggestion.name} />
+            <ComboFinder commanderNames={suggestion.cards.map((c) => c.name)} />
 
             <p className="explain-caveat">
               Matches come from card text, keywords, and creature types, not a model of how the deck actually

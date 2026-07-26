@@ -56,8 +56,11 @@ export class SpellbookError extends Error {
 
 const cache = new Map<string, { at: number; value: Omit<ComboLookup, 'cached'> }>();
 
-function cacheKey(commander: string, cards: string[]): string {
-  return JSON.stringify([commander.toLowerCase(), [...cards].map((c) => c.toLowerCase()).sort()]);
+function cacheKey(commanderNames: string[], cards: string[]): string {
+  return JSON.stringify([
+    [...commanderNames].map((c) => c.toLowerCase()).sort(),
+    [...cards].map((c) => c.toLowerCase()).sort(),
+  ]);
 }
 
 /**
@@ -128,12 +131,13 @@ function describeFailure(status: number, body: string): string {
 }
 
 /**
- * Asks Commander Spellbook which combos this commander and these cards make.
- * Returns combos you can already assemble, plus near-misses one card short.
+ * Asks Commander Spellbook which combos this commander (one card, or two
+ * under a Partner-family ability) and these cards make. Returns combos you
+ * can already assemble, plus near-misses one card short.
  */
-export async function findCombos(commanderName: string, cardNames: string[]): Promise<ComboLookup> {
+export async function findCombos(commanderNames: string[], cardNames: string[]): Promise<ComboLookup> {
   const cards = cardNames.slice(0, MAX_CARDS);
-  const key = cacheKey(commanderName, cards);
+  const key = cacheKey(commanderNames, cards);
 
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
@@ -147,7 +151,7 @@ export async function findCombos(commanderName: string, cardNames: string[]): Pr
       headers: HEADERS,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       body: JSON.stringify({
-        commanders: [{ card: commanderName }],
+        commanders: commanderNames.map((card) => ({ card })),
         main: cards.map((card) => ({ card })),
       }),
     });
@@ -176,7 +180,10 @@ export async function findCombos(commanderName: string, cardNames: string[]): Pr
   const payload = (await response.json()) as Record<string, unknown>;
   const results = (payload.results ?? payload) as Record<string, unknown>;
 
-  const ownedLower = new Set([commanderName.toLowerCase(), ...cards.map((c) => c.toLowerCase())]);
+  const ownedLower = new Set([
+    ...commanderNames.map((c) => c.toLowerCase()),
+    ...cards.map((c) => c.toLowerCase()),
+  ]);
   const toResults = (value: unknown) =>
     (Array.isArray(value) ? value : [])
       .map((variant) => normalizeVariant(variant, ownedLower))

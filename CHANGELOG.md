@@ -9,6 +9,16 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Added
+
+- Partner, Partner—[text], Partner with [Name], Friends forever, Choose a
+  Background, and Doctor's companion are now recognized: a commander with
+  one of these abilities appears both as a solo suggestion and as one
+  suggestion per valid pairing, on the same ranked list.
+- A non-functional "EDHRec" placeholder button next to "Find combos" on
+  each suggestion, reserving the spot for a future one-time lookup. No
+  EDHREC data is fetched.
+
 ## [1.0.0] — 2026-07-26
 
 First versioned release. This project had been under active development

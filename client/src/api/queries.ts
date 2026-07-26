@@ -22,17 +22,18 @@ export function useRecommendations(submittedList: string) {
 }
 
 /**
- * Commander Spellbook combos for one commander.
+ * Commander Spellbook combos for one commander unit (one name, or two under a
+ * Partner-family ability).
  *
  * `enabled` stays false until the user clicks, so nothing is requested while
  * they're just reading. Cached results are still returned when it's false,
  * which is what lets a collapsed and reopened panel show its combos again
  * without asking Spellbook a second time.
  */
-export function useCombos(commanderName: string, submittedList: string, enabled: boolean) {
+export function useCombos(commanderNames: string[], submittedList: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['combos', commanderName, submittedList],
-    queryFn: () => fetchCombos(submittedList, commanderName),
+    queryKey: ['combos', [...commanderNames].sort(), submittedList],
+    queryFn: () => fetchCombos(submittedList, commanderNames),
     enabled,
   });
 }

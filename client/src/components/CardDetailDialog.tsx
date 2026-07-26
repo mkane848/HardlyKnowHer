@@ -3,10 +3,11 @@ import type { ReactNode } from 'react';
 import { identityName, sortWubrg } from '../lib/mtg';
 import { ManaSymbol } from './ManaSymbol';
 import { ManaCost } from './ManaCost';
-import type { CommanderSuggestionDTO } from '../types';
+import type { BracketEstimateDTO, CommanderCardDTO } from '../types';
 
 interface Props {
-  suggestion: CommanderSuggestionDTO;
+  card: CommanderCardDTO;
+  bracket: BracketEstimateDTO;
   children: ReactNode;
 }
 
@@ -22,8 +23,8 @@ interface Props {
  * prices and legality across every format are all a click away on the real
  * page, which this links to rather than approximating badly.
  */
-export function CardDetailDialog({ suggestion, children }: Props) {
-  const { power, toughness } = suggestion;
+export function CardDetailDialog({ card, bracket, children }: Props) {
+  const { power, toughness } = card;
   const hasStats = power !== null && toughness !== null;
 
   return (
@@ -33,19 +34,17 @@ export function CardDetailDialog({ suggestion, children }: Props) {
         <Dialog.Overlay className="dialog-overlay" />
         <Dialog.Content className="dialog-content" aria-describedby={undefined}>
           <div className="dialog-card">
-            {suggestion.imageUri && (
-              <img className="dialog-art" src={suggestion.imageUri} alt="" loading="lazy" />
-            )}
+            {card.imageUri && <img className="dialog-art" src={card.imageUri} alt="" loading="lazy" />}
 
             <div className="dialog-body">
               <div className="dialog-titlebar">
-                <Dialog.Title className="dialog-name">{suggestion.name}</Dialog.Title>
-                {suggestion.manaCost && <ManaCost cost={suggestion.manaCost} />}
+                <Dialog.Title className="dialog-name">{card.name}</Dialog.Title>
+                {card.manaCost && <ManaCost cost={card.manaCost} />}
               </div>
 
-              {suggestion.typeLine && <p className="dialog-type">{suggestion.typeLine}</p>}
+              {card.typeLine && <p className="dialog-type">{card.typeLine}</p>}
 
-              {suggestion.oracleText && <p className="dialog-oracle">{suggestion.oracleText}</p>}
+              {card.oracleText && <p className="dialog-oracle">{card.oracleText}</p>}
 
               {hasStats && (
                 <p className="dialog-stats">
@@ -58,36 +57,31 @@ export function CardDetailDialog({ suggestion, children }: Props) {
                   <dt>Color identity</dt>
                   <dd>
                     <span className="dialog-pips">
-                      {suggestion.colorIdentity.length === 0 ? (
+                      {card.colorIdentity.length === 0 ? (
                         <ManaSymbol color="C" decorative />
                       ) : (
-                        sortWubrg(suggestion.colorIdentity).map((color) => (
+                        sortWubrg(card.colorIdentity).map((color) => (
                           <ManaSymbol key={color} color={color} decorative />
                         ))
                       )}
                     </span>
-                    {identityName(suggestion.colorIdentity)}
+                    {identityName(card.colorIdentity)}
                   </dd>
                 </div>
                 <div>
                   <dt>Commander</dt>
-                  <dd>Legal{suggestion.isGameChanger ? ' · Game Changer' : ''}</dd>
+                  <dd>Legal{card.isGameChanger ? ' · Game Changer' : ''}</dd>
                 </div>
                 <div>
                   <dt>Bracket estimate</dt>
                   <dd>
-                    {suggestion.bracket.range} — {suggestion.bracket.label}
+                    {bracket.range} — {bracket.label}
                   </dd>
                 </div>
               </dl>
 
-              {suggestion.scryfallUri && (
-                <a
-                  className="dialog-link"
-                  href={suggestion.scryfallUri}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
+              {card.scryfallUri && (
+                <a className="dialog-link" href={card.scryfallUri} target="_blank" rel="noreferrer noopener">
                   View on Scryfall — printings, rulings, prices
                 </a>
               )}

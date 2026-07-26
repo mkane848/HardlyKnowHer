@@ -79,9 +79,10 @@ export function fetchRecommendations(rawList: string): Promise<RecommendResponse
 }
 
 /**
- * Asks Commander Spellbook (via our server) which combos this commander makes
- * with the user's cards. Only called from an explicit click — never on load.
+ * Asks Commander Spellbook (via our server) which combos this commander unit
+ * (one name, or two under a Partner-family ability) makes with the user's
+ * cards. Only called from an explicit click — never on load.
  */
-export function fetchCombos(rawList: string, commanderName: string): Promise<ComboLookupResponse> {
-  return postJson<ComboLookupResponse>('/api/combos', { list: rawList, commanderName });
+export function fetchCombos(rawList: string, commanderNames: string[]): Promise<ComboLookupResponse> {
+  return postJson<ComboLookupResponse>('/api/combos', { list: rawList, commanderNames });
 }
