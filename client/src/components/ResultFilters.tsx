@@ -2,6 +2,7 @@ import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { COLOR_LABELS, WUBRG } from '../lib/mtg';
 import { ManaSymbol } from './ManaSymbol';
 import { hasActiveFilters, type SuggestionFilters } from '../lib/filters';
+import { SORT_MODE_LABELS, type SortMode } from '../lib/sort';
 
 interface Props {
   filters: SuggestionFilters;
@@ -10,6 +11,8 @@ interface Props {
   availableThemes: string[];
   hasColorless: boolean;
   hasMulticolor: boolean;
+  sortMode: SortMode;
+  onSortModeChange: (mode: SortMode) => void;
   shown: number;
   total: number;
 }
@@ -21,6 +24,8 @@ export function ResultFilters({
   availableThemes,
   hasColorless,
   hasMulticolor,
+  sortMode,
+  onSortModeChange,
   shown,
   total,
 }: Props) {
@@ -128,6 +133,18 @@ export function ResultFilters({
         <span className="filter-count">
           {shown === total ? `${total} commanders` : `${shown} of ${total} commanders`}
         </span>
+
+        <label className="sort-control">
+          <span className="filter-label">Sort</span>
+          <select value={sortMode} onChange={(event) => onSortModeChange(event.target.value as SortMode)}>
+            {(Object.entries(SORT_MODE_LABELS) as [SortMode, string][]).map(([mode, label]) => (
+              <option key={mode} value={mode}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+
         {active && (
           <button
             type="button"

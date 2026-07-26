@@ -25,6 +25,10 @@ export interface SupportingCard {
   quantity: number;
   typeLine: string | null;
   isGameChanger: boolean;
+  // Carried so the UI can show the card itself when one of these is tapped,
+  // rather than making the name a dead end.
+  imageUri: string | null;
+  scryfallUri: string | null;
 }
 
 /** A theme (or archetype — see ARCHETYPES below) the commander shares with the list. */
@@ -241,6 +245,8 @@ function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
     quantity,
     typeLine: row.type_line,
     isGameChanger: !!row.game_changer,
+    imageUri: row.image_uri,
+    scryfallUri: row.scryfall_uri,
   };
 }
 

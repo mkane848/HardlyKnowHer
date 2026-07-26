@@ -395,3 +395,65 @@ not the live bulk file. Worth a spot-check against a handful of real
 Partner/Background cards (e.g. Tymna the Weaver, Kraum Ludevic's Opus,
 Tiana Ship's Caretaker + a real Background) after the next `prepare-data`
 run.
+
+## Merged with `main`'s independent Partner/Background work
+
+While this branch built the above, a separate PR (`main`, PR #2, commit
+`7997147`) independently built the *same* feature with a different design:
+single-card suggestions carrying a `pairing` field plus a `partnerOptions[]`
+list you choose a second commander from, computed by `detectPairing`/
+`canPair`/`buildPartnerOptions` in its own `partners.ts`/`synergy.ts`. Both
+landed on their respective branches at the same time, then had to be
+reconciled in one merge. The user chose to keep **this branch's** design
+(precomputed pairs, each its own ranked suggestion) over main's
+(pick-a-partner-after-the-fact) — if that decision ever needs revisiting,
+main's approach is still recoverable from its own git history.
+
+main also carried real, independent work unrelated to Partner/Background,
+which was carried forward on top of the kept design:
+- **Art preview** — `CardImageDialog.tsx` (whole-card image popover,
+  separate from the rules-text `CardDetailDialog`), wired onto commander
+  art and every supporting-card name. `SupportingCard`/`SupportingCardDTO`
+  and `CommanderCardDTO` gained `imageUri`/`scryfallUri`/`manaValue` fields
+  for this.
+- **Sort mode** — `lib/sort.ts` ("Best match" vs "Colors, name, mana
+  value"), adapted from main's single-card version to compare a unit's
+  joined display name and summed mana value across 1-2 cards.
+- **Export** — "Copy list" / "Download .txt" in `RecommendationResults.tsx`.
+- **Mobile layout** — `viewport-fit=cover` + the `env(safe-area-inset-*)`
+  padding in `index.css`, so content clears notches/home-indicator/URL bar.
+- **"Still has supporting cards" fix** — `lib/suggestions.ts`
+  (`visibleThemeSupport`/`visibleTribeSupport`, extended here with a
+  `visibleKeywordSupport` for the keyword category main didn't have): a
+  theme/tribe/keyword matched against the collection *globally* can end up
+  with zero cards once narrowed to a specific commander's colour identity;
+  this filters those out of both the card display and the filter bar's
+  available options instead of showing/offering an empty reason. This was
+  a real latent bug in this branch's original synergy.ts too, not something
+  specific to main's design.
+- **Regression test suite** — main added `client/scripts/test-*.ts` +
+  `server/scripts/test-bracket.ts`, dependency-free (node:assert + tsx,
+  matching this project's existing test convention). Kept: `test-mtg.ts`,
+  `test-bracket.ts` (untouched by either side's Partner work, ported as-is);
+  adapted to this branch's DTO/filter shape: `fixtures.ts`,
+  `test-suggestions.ts`, `test-sort.ts`, `test-filters.ts` (rewritten
+  against this branch's simple array-based `SuggestionFilters`, not main's
+  include/exclude `FilterSelection` model — see below). **Deleted**:
+  `test-partners.ts`, `test-synergy.ts` — these tested main's discarded
+  `detectPairing`/`canPair`/`buildPartnerOptions` API, which no longer
+  exists. This branch's `partners.ts`/`synergy.ts` still have no automated
+  test coverage of their own (only the hand-fixture verification noted
+  above) — worth writing if this file changes again.
+
+**Deliberately not adopted**: main also rewrote the filter bar from a
+multi-select "must include" model to a three-state include/exclude-per-value
+model (`FilterMode`, `cycleSelection`, `modeOf` in its `lib/filters.ts`,
+click-to-cycle chips in `ResultFilters.tsx`). That's a real, independent
+filter-UX upgrade, but it wasn't part of what was asked to be carried
+forward (sort/export/art-preview/mobile-layout/tests were) and swapping the
+whole filtering paradigm felt like a bigger call to make unilaterally mid-
+merge. This branch kept its original simple filter model (colours + a
+colorless/multicolor category toggle + brackets + themes, all "must
+include", via Radix `ToggleGroup`) and only added the sort control to it.
+If the include/exclude model is wanted later, it's sitting in main's git
+history (`lib/filters.ts`, `ResultFilters.tsx`) ready to port over.

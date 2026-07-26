@@ -18,6 +18,16 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 - A non-functional "EDHRec" placeholder button next to "Find combos" on
   each suggestion, reserving the spot for a future one-time lookup. No
   EDHREC data is fetched.
+- Whole-card art preview: tapping a commander's image, or any supporting
+  card cited in a "Why this commander?" explanation, opens that card at
+  its own proportions.
+- A sort control (best match, or colour/name/mana value) alongside the
+  existing filters.
+- "Copy list" and "Download .txt" export the current suggestion list.
+- Suggestion tags and filter options (Tribal/Themes/Keywords, and the
+  filter bar's theme chips) now only count a theme or tribe if it still
+  has supporting cards after narrowing to that commander's colour
+  identity, rather than showing one with nothing behind it.
 
 ## [1.0.0] — 2026-07-26
 

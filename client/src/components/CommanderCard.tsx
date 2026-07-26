@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ComboFinder } from './ComboFinder';
 import { CardDetailDialog } from './CardDetailDialog';
+import { CardImageDialog } from './CardImageDialog';
 import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
+import { visibleKeywordSupport, visibleThemeSupport, visibleTribeSupport } from '../lib/suggestions';
 import { ManaSymbol } from './ManaSymbol';
 import type { BracketEstimateDTO, CommanderCardDTO, CommanderSuggestionDTO, SupportingCardDTO } from '../types';
 
@@ -16,7 +18,14 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
       {cards.map((card) => (
         <li key={card.name} className="support-card">
           {card.quantity > 1 && <span className="support-qty">{card.quantity}×</span>}
-          <span className="support-name">{card.name}</span>
+          {/* The name opens the card itself — the list is where you're
+              checking "which cards did it actually mean?", and a name alone
+              often isn't enough to remember what one does. */}
+          <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
+            <button type="button" className="support-name" aria-label={`Show the card ${card.name}`}>
+              {card.name}
+            </button>
+          </CardImageDialog>
           {card.isGameChanger && (
             <span className="support-gc" title="On the Game Changers list">
               GC
@@ -25,6 +34,18 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** One face's own art, opening a whole-card image preview when tapped. */
+function CommanderArt({ card }: { card: CommanderCardDTO }) {
+  if (!card.imageUri) return null;
+  return (
+    <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
+      <button type="button" className="commander-art-trigger" aria-label={`Show the full card for ${card.name}`}>
+        <img className="commander-image" src={card.imageUri} alt={card.name} loading="lazy" />
+      </button>
+    </CardImageDialog>
   );
 }
 
@@ -84,35 +105,35 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
 
   const displayName = suggestion.cards.map((c) => c.name).join(' + ');
   const isGameChanger = suggestion.cards.some((c) => c.isGameChanger);
+  const isPair = suggestion.cards.length > 1;
+
+  // Themes/tribes/keywords the collection profile matched globally can still
+  // end up with zero cards once narrowed to ones that fit this commander's
+  // colour identity — that's not a real reason to suggest it, so it's
+  // filtered out here rather than shown as an empty group.
+  const tribeSupport = visibleTribeSupport(suggestion);
+  const themeSupport = visibleThemeSupport(suggestion);
+  const keywordSupport = visibleKeywordSupport(suggestion);
+  const tribeTypes = tribeSupport.map((t) => t.type);
+  const themeLabels = themeSupport.map((t) => t.label);
+  const keywordLabels = keywordSupport.map((k) => k.keyword);
 
   const hasReasons =
-    suggestion.themeSupport.length > 0 ||
-    suggestion.tribeSupport.length > 0 ||
-    suggestion.keywordSupport.length > 0 ||
+    themeSupport.length > 0 ||
+    tribeSupport.length > 0 ||
+    keywordSupport.length > 0 ||
     suggestion.gameChangerCards.length > 0;
-
-  const isPair = suggestion.cards.length > 1;
 
   return (
     <article className={`commander-card${expanded ? ' is-expanded' : ''}${isPair ? ' is-pair' : ''}`}>
       {isPair ? (
         <div className="commander-image-row">
-          {suggestion.cards.map(
-            (card) =>
-              card.imageUri && (
-                <img key={card.oracleId} className="commander-image" src={card.imageUri} alt={card.name} loading="lazy" />
-              )
-          )}
+          {suggestion.cards.map((card) => (
+            <CommanderArt key={card.oracleId} card={card} />
+          ))}
         </div>
       ) : (
-        suggestion.cards[0].imageUri && (
-          <img
-            className="commander-image"
-            src={suggestion.cards[0].imageUri}
-            alt={suggestion.cards[0].name}
-            loading="lazy"
-          />
-        )
+        <CommanderArt card={suggestion.cards[0]} />
       )}
       <button
         type="button"
@@ -147,19 +168,19 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
           Fits {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} from your list
         </p>
 
-        {suggestion.matchedCreatureTypes.length > 0 && (
+        {tribeTypes.length > 0 && (
           <p className="commander-tags">
-            <span className="commander-tags-label">Tribal</span> {suggestion.matchedCreatureTypes.join(', ')}
+            <span className="commander-tags-label">Tribal</span> {tribeTypes.join(', ')}
           </p>
         )}
-        {suggestion.matchedThemes.length > 0 && (
+        {themeLabels.length > 0 && (
           <p className="commander-tags">
-            <span className="commander-tags-label">Themes</span> {suggestion.matchedThemes.join(', ')}
+            <span className="commander-tags-label">Themes</span> {themeLabels.join(', ')}
           </p>
         )}
-        {suggestion.matchedKeywords.length > 0 && (
+        {keywordLabels.length > 0 && (
           <p className="commander-tags">
-            <span className="commander-tags-label">Keywords</span> {suggestion.matchedKeywords.join(', ')}
+            <span className="commander-tags-label">Keywords</span> {keywordLabels.join(', ')}
           </p>
         )}
 
@@ -184,10 +205,10 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
           <div className="explain-panel" id={detailsId}>
             {/* No "What it does" section here — the rules text is on the card
                 face now, so repeating it would just push the reasoning down. */}
-            {suggestion.tribeSupport.length > 0 && (
+            {tribeSupport.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Tribal overlap</h4>
-                {suggestion.tribeSupport.map((tribe) => (
+                {tribeSupport.map((tribe) => (
                   <div key={tribe.type} className="explain-group">
                     <p className="explain-group-title">
                       {tribe.type} <span className="explain-count">{cardCount(tribe.cards)} in your list</span>
@@ -201,10 +222,10 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
               </section>
             )}
 
-            {suggestion.themeSupport.length > 0 && (
+            {themeSupport.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Themes you're already building</h4>
-                {suggestion.themeSupport.map((theme) => (
+                {themeSupport.map((theme) => (
                   <div key={theme.key} className="explain-group">
                     <p className="explain-group-title">
                       {theme.label} <span className="explain-count">{cardCount(theme.cards)} in your list</span>
@@ -216,10 +237,10 @@ export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionD
               </section>
             )}
 
-            {suggestion.keywordSupport.length > 0 && (
+            {keywordSupport.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Shared keywords</h4>
-                {suggestion.keywordSupport.map((kw) => (
+                {keywordSupport.map((kw) => (
                   <div key={kw.keyword} className="explain-group">
                     <p className="explain-group-title">
                       {kw.keyword} <span className="explain-count">{cardCount(kw.cards)} in your list</span>

@@ -1,4 +1,5 @@
 import type { CommanderSuggestionDTO } from '../types';
+import { visibleThemeLabels } from './suggestions';
 
 export type ColorCategory = 'colorless' | 'multicolor' | null;
 
@@ -56,10 +57,13 @@ function matchesColorCategory(suggestion: CommanderSuggestionDTO, category: Colo
   return true;
 }
 
-/** Themes are AND-ed: each one you add narrows the list further. */
+/** Themes are AND-ed: each one you add narrows the list further. Matched
+ * against the same "still has supporting cards after the identity filter"
+ * set the card display uses, so a filter chip never claims a theme that
+ * suggestion isn't actually showing as a reason. */
 function matchesThemes(suggestion: CommanderSuggestionDTO, selected: string[]): boolean {
   if (selected.length === 0) return true;
-  const present = new Set(suggestion.matchedThemes);
+  const present = new Set(visibleThemeLabels(suggestion));
   return selected.every((theme) => present.has(theme));
 }
 
@@ -83,6 +87,9 @@ export function applyFilters(
 /**
  * The filter values worth offering, taken from the results themselves — no
  * point showing a Bracket 4–5 toggle when nothing in the list is Bracket 4–5.
+ * Themes are drawn from the same "still has supporting cards" set the card
+ * display uses, so a filter chip never offers a theme no suggestion actually
+ * shows.
  */
 export function availableFilterValues(suggestions: CommanderSuggestionDTO[]) {
   const brackets = new Set<string>();
@@ -93,7 +100,7 @@ export function availableFilterValues(suggestions: CommanderSuggestionDTO[]) {
 
   for (const suggestion of suggestions) {
     brackets.add(suggestion.bracket.range);
-    suggestion.matchedThemes.forEach((theme) => themes.add(theme));
+    visibleThemeLabels(suggestion).forEach((theme) => themes.add(theme));
     suggestion.colorIdentity.forEach((color) => colors.add(color));
     if (suggestion.colorIdentity.length === 0) hasColorless = true;
     if (suggestion.colorIdentity.length >= 2) hasMulticolor = true;

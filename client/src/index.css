@@ -56,10 +56,14 @@ body {
   }
 }
 
+/* Safe-area insets keep the top of the page out from under a mobile URL bar
+   or notch, and the bottom clear of the home indicator. The max() means the
+   normal desktop padding still applies where the insets are zero. */
 .app-shell {
   max-width: 960px;
   margin: 0 auto;
-  padding: 3rem 1.5rem 4rem;
+  padding: max(3rem, calc(env(safe-area-inset-top) + 1.5rem)) max(1.5rem, env(safe-area-inset-right))
+    max(4rem, calc(env(safe-area-inset-bottom) + 2rem)) max(1.5rem, env(safe-area-inset-left));
 }
 
 .app-nav {
@@ -288,6 +292,29 @@ body {
   color: var(--text-muted);
 }
 
+.export-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.export-button {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 7px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.export-button:hover {
+  border-color: var(--brass);
+}
+
 .suggestion-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -342,7 +369,7 @@ body {
   line-height: 0;
   cursor: pointer;
   opacity: 0.45;
-  transition: opacity 0.15s ease, border-color 0.15s ease;
+  transition: opacity 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .toggle-pip .pip {
@@ -353,12 +380,24 @@ body {
   opacity: 0.8;
 }
 
-.toggle-pip[data-state='on'] {
+/* Include/exclude read as colour, not just a filled-in state, since both
+   are "active" — green ring to require a value, red ring to rule it out. */
+.toggle-pip-include {
   opacity: 1;
-  border-color: var(--brass-bright);
+  border-color: #2e8c50;
+  box-shadow: 0 0 0 1px #2e8c50;
+}
+
+.toggle-pip-exclude {
+  opacity: 1;
+  border-color: var(--pip-r);
+  box-shadow: 0 0 0 1px var(--pip-r);
 }
 
 .toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-family: var(--font-body);
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -375,17 +414,52 @@ body {
   color: var(--text-primary);
 }
 
-.toggle-chip[data-state='on'] {
-  background: rgba(184, 132, 42, 0.2);
-  border-color: var(--brass-bright);
+.toggle-chip-include {
+  background: rgba(46, 140, 80, 0.18);
+  border-color: #2e8c50;
+  color: #dff5e5;
+}
+
+.toggle-chip-exclude {
+  background: rgba(198, 54, 42, 0.18);
+  border-color: var(--pip-r);
+  color: #ffd9d4;
+}
+
+.chip-mode-icon {
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  /* A flex item won't shrink below its min-content width by default, and
+     this one's is set by the longest option text — enough to push the bar
+     past the viewport on a phone. */
+  min-width: 0;
+}
+
+.sort-control select {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
   color: var(--text-primary);
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .filter-footer {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  padding-top: 0.2rem;
+  flex-wrap: wrap;
   border-top: 1px solid var(--ink-border);
   margin-top: 0.1rem;
   padding-top: 0.75rem;
@@ -466,11 +540,12 @@ body {
   position: relative;
 }
 
+
 .dismiss-button {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  z-index: 1;
+  z-index: 6;
   width: 26px;
   height: 26px;
   display: flex;
@@ -507,12 +582,31 @@ body {
   }
 }
 
+/* The cropped hero shot is what the grid wants — the whole card is a tap
+   away in the dialog, which is the only place it can be shown at its own
+   proportions without either distorting it or dictating the card's height. */
+.commander-art-trigger {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+}
+
 .commander-image {
   width: 100%;
   display: block;
   aspect-ratio: 5 / 4;
   object-fit: cover;
   object-position: top;
+  transition: transform 0.2s ease;
+}
+
+.commander-art-trigger:hover .commander-image {
+  transform: scale(1.03);
 }
 
 /* A Partner/Background pair shows both cards' art side by side rather than
@@ -522,8 +616,23 @@ body {
   display: flex;
 }
 
-.commander-image-row .commander-image {
+.commander-image-row .commander-art-trigger {
   width: 50%;
+  /* Only the row's own outer corners round; a raw 14px on every trigger
+     would round both inner edges too, leaving a visible gap at the seam. */
+  border-radius: 0;
+}
+
+.commander-image-row .commander-art-trigger:first-child {
+  border-radius: 14px 0 0 0;
+}
+
+.commander-image-row .commander-art-trigger:last-child {
+  border-radius: 0 14px 0 0;
+}
+
+.commander-image-row .commander-image {
+  width: 100%;
   aspect-ratio: 5 / 6;
 }
 
@@ -706,6 +815,87 @@ body {
   color: var(--pip-r);
 }
 
+.badge-pairing {
+  background: rgba(15, 106, 181, 0.15);
+  color: #0f5c9c;
+}
+
+/* Second-commander options */
+
+.partner-list {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--parchment-dim);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.partner-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0.65rem;
+  background: rgba(36, 31, 22, 0.04);
+}
+
+.partner-item + .partner-item {
+  border-top: 1px solid var(--parchment-dim);
+}
+
+.partner-name {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.partner-name:hover,
+.partner-name:focus-visible {
+  text-decoration: underline;
+  color: #7a5615;
+}
+
+.partner-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.partner-pips {
+  display: inline-flex;
+  gap: 0.12rem;
+  font-size: 0.85rem;
+}
+
+.partner-identity {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-text-muted);
+}
+
+.partner-gain {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #1f7a45;
+  background: rgba(31, 122, 69, 0.12);
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+}
+
 .commander-meta {
   font-size: 0.85rem;
   margin: 0;
@@ -826,25 +1016,49 @@ body {
   margin: 0.15rem 0 0;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex-direction: column;
+  border: 1px solid var(--parchment-dim);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .support-card {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.3rem;
-  background: rgba(36, 31, 22, 0.07);
-  border: 1px solid var(--parchment-dim);
-  border-radius: 999px;
-  padding: 0.2rem 0.6rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
   font-size: 0.78rem;
+  background: rgba(36, 31, 22, 0.04);
+}
+
+.support-card + .support-card {
+  border-top: 1px solid var(--parchment-dim);
+}
+
+.support-name {
+  flex: 1;
+  /* A button, but it reads as the list's text — the underline on hover is
+     what says it's tappable, rather than a control's chrome in every row. */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.support-name:hover,
+.support-name:focus-visible {
+  text-decoration: underline;
+  color: #7a5615;
 }
 
 .support-qty {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--ink-text-muted);
+  min-width: 1.5em;
 }
 
 .support-gc {
@@ -874,8 +1088,11 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
   width: min(94vw, 460px);
-  max-height: 90vh;
+  /* dvh rather than vh so a mobile URL bar sliding into view shrinks this
+     instead of pushing its top and bottom off-screen. */
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   overflow-y: auto;
+  overscroll-behavior: contain;
   z-index: 21;
   border-radius: 14px;
 }
@@ -886,6 +1103,75 @@ body {
   border: 1px solid var(--parchment-dim);
   border-radius: 14px;
   overflow: hidden;
+}
+
+/* Full-card dialog.
+   No aspect-ratio and no fixed height anywhere in here: the image keeps its
+   natural proportions and is bounded by the viewport, so a tall card scales
+   down on a short screen instead of being squashed into a box that doesn't
+   fit it. dvh (not vh) so a mobile URL bar sliding in doesn't crop it, and
+   the safe-area insets keep it clear of notches and home indicators. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.card-image-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(92vw, 460px);
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+/* Both bounds are in viewport units rather than percentages: the dialog is
+   position:fixed with an auto width, so a percentage here would resolve
+   against a box that is itself sized by this image, and collapse. */
+.card-image-full {
+  display: block;
+  max-width: min(92vw, 460px);
+  /* Leaves room for the footer line beneath the card. */
+  max-height: calc(
+    100dvh - 5.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4.75% / 3.5%; /* matches the rounding of a real card */
+  box-shadow: 0 18px 44px rgba(12, 10, 7, 0.6);
+}
+
+.card-image-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.card-image-name {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.card-image-link {
+  font-size: 0.78rem;
+  color: var(--brass-bright);
 }
 
 .dialog-art {
@@ -999,22 +1285,26 @@ body {
   color: #7a5615;
 }
 
+/* 44px is the minimum comfortable touch target, and it matters most here:
+   this control sits at the top of the screen on mobile, right where the URL
+   bar and notch encroach. */
 .dialog-close {
   position: absolute;
   top: 0.6rem;
   right: 0.6rem;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   line-height: 1;
   color: var(--ink-text);
   background: rgba(244, 236, 216, 0.9);
   border: 1px solid var(--parchment-dim);
   border-radius: 50%;
   cursor: pointer;
+  z-index: 2;
 }
 
 .dialog-close:hover {
@@ -1060,6 +1350,20 @@ body {
 
 .about-caveat a {
   color: #7a5615;
+}
+
+/* On the image dialog the close button overlays the card art rather than a
+   parchment panel, so it needs its own contrast to stay readable. */
+.card-image-close {
+  top: 0.4rem;
+  right: 0.4rem;
+  background: rgba(20, 16, 10, 0.75);
+  border-color: rgba(244, 236, 216, 0.4);
+  color: var(--text-primary);
+}
+
+.card-image-close:hover {
+  background: rgba(20, 16, 10, 0.9);
 }
 
 /* Combo lookup */
@@ -1115,42 +1419,74 @@ body {
 }
 
 .combo-item {
-  border-left: 2px solid rgba(184, 132, 42, 0.5);
-  padding-left: 0.65rem;
+  background: rgba(36, 31, 22, 0.05);
+  border: 1px solid var(--parchment-dim);
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.35rem;
 }
 
 .combo-cards {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
   margin: 0;
   line-height: 1.4;
 }
 
 .combo-produces {
-  font-size: 0.78rem;
-  color: var(--ink-text-muted);
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.76rem;
   margin: 0;
   line-height: 1.4;
 }
 
 .combo-arrow {
   color: var(--brass);
+  font-weight: 700;
+}
+
+.combo-produces-list {
+  font-weight: 600;
+  color: #7a5615;
+  background: rgba(184, 132, 42, 0.14);
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
 }
 
 .combo-missing {
-  font-size: 0.75rem;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--pip-r);
+  background: rgba(198, 54, 42, 0.1);
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
   margin: 0;
+}
+
+.combo-steps-details {
+  font-size: 0.75rem;
+}
+
+.combo-steps-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #7a5615;
+}
+
+.combo-steps-details summary::marker {
+  color: var(--brass);
 }
 
 .combo-steps {
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--ink-text-muted);
-  margin: 0.1rem 0 0;
+  margin: 0.35rem 0 0;
   white-space: pre-line;
 }
 
@@ -1187,5 +1523,44 @@ body {
   .primary-button {
     margin-left: 0;
     width: 100%;
+  }
+
+  /* The export buttons sit on the same row as the match summary on desktop;
+     on a narrow screen they get their own full-width row instead of being
+     squeezed against the edge. */
+  .export-controls {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .export-button {
+    flex: 1;
+    padding: 0.5rem 0.7rem;
+  }
+
+  .sort-control {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .sort-control select {
+    flex: 1;
+  }
+
+  /* Keyed to width rather than only to (hover: none): a phone-sized screen
+     wants a real touch target whether or not the browser claims a pointer,
+     and this is the control nearest the screen edge. */
+  .dismiss-button {
+    width: 40px;
+    height: 40px;
+    font-size: 1.35rem;
+  }
+}
+
+@media (hover: none) {
+  .dismiss-button {
+    width: 40px;
+    height: 40px;
+    font-size: 1.35rem;
   }
 }
