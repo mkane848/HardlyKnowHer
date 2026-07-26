@@ -9,6 +9,31 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Changed
+
+- A theme, tribe, or keyword now needs at least **three** supporting cards
+  to count, measured after narrowing to that commander's own colour
+  identity. Below that it is dropped from the recommendation engine
+  entirely, not just hidden — it no longer contributes to a commander's
+  score, and no longer appears in "Why this commander?". A group of one or
+  two cards is noise, and scoring on it ranked commanders on evidence too
+  thin to check.
+- Result filters are now include/exclude rather than include-only: tap a
+  chip once to require it, again to exclude it, again to clear it. This
+  applies to colours, Colorless/Multicolor, Brackets, and themes alike.
+- Colorless and Multicolor moved out of their own row and into the Colors
+  row alongside the WUBRG pips, since they describe a colour identity too.
+
+### Added
+
+- Each suggestion shows a match score relative to the best match currently
+  on screen, with a hover/tap tooltip breaking down what drove it.
+
+### Removed
+
+- `@radix-ui/react-toggle-group`, now unused — the filter chips need a
+  three-state cycle that a toggle group does not model.
+
 ## [1.1.0] — 2026-07-26
 
 ### Added

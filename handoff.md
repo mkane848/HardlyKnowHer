@@ -86,10 +86,15 @@ All explicitly requested by the user unless noted:
   this back to the font without re-checking that trade.
 
 - **Radix UI** for interactive controls that need real keyboard and
-  screen-reader behaviour (the filter toggle groups). TanStack has no
-  equivalent — it ships data and interaction *logic*, not accessible UI
-  primitives — so the two are used side by side rather than one instead of
-  the other.
+  screen-reader behaviour — currently just `Dialog`, for the card-detail,
+  card-image, and About popovers. TanStack has no equivalent — it ships
+  data and interaction *logic*, not accessible UI primitives — so the two
+  are used side by side rather than one instead of the other. The filter
+  chips used to be a Radix `ToggleGroup`, but that only supports a
+  single-select/multi-select model, not the three-state
+  include/exclude/off cycle the filters now use — so they're plain
+  `<button>`s with manual `aria-pressed`-equivalent state classes instead,
+  and `@radix-ui/react-toggle-group` was dropped as a dependency.
 
 - **Zustand + TanStack Query** for state, split by what the state *is*:
   Zustand (`client/src/store/useAppStore.ts`) holds client state only — the

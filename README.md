@@ -141,9 +141,12 @@ Each suggestion has a **"Why this commander?"** disclosure. Expanding it shows
 every creature type, keyword, and theme it shares with your list, the
 specific cards behind each of those signals, and which cards drive the
 Bracket estimate. Only cards that fit the commander's colour identity are
-cited, and a theme/tribe/keyword only counts if it still has at least one
-citable card once narrowed that way — a global match with nothing left to
-show for it isn't shown as a reason.
+cited, and a theme/tribe/keyword only counts — both as a reason shown here
+and toward whether the commander is suggested at all — if it still has at
+least three citable cards once narrowed that way. A global match that
+thins out to one or two cards once narrowed to this commander's own colours
+isn't a real pattern, so it's dropped entirely rather than shown as a weak
+reason.
 
 Tapping a commander's art, or any cited card's name, opens that card at its
 own proportions. The rules-text box on the card face opens a fuller detail
@@ -167,11 +170,21 @@ and `handoff.md` for the plan.
 
 ## Filtering, sorting, and exporting results
 
-- **Filter** by color (subset matching — picking Black and Green shows what
-  you could actually build in Golgari, not just anything that touches either
-  colour), by Colorless or Multicolor, by Bracket, and by theme.
+- **Filter** by color, Colorless/Multicolor, Bracket, and theme, all in the
+  same tri-state include/exclude model: tap a chip once to require it,
+  again to exclude it, again to clear it. Colour chips are subset matching
+  when included (picking Black and Green shows what you could actually
+  build in Golgari, not just anything that touches either colour) and
+  touch matching when excluded (excluding Black drops anything with black
+  in its identity). Colorless and Multicolor live in the same row as the
+  WUBRG pips, since they're really just another way of describing a colour
+  identity.
 - **Sort** by best match (the server's score, the default) or by colour
   count → WUBRG order → name → mana value.
+- Each suggestion's badge row shows a **match score**, relative to the best
+  match currently on screen (the top suggestion always reads 100%). Hover
+  or tap it for a breakdown of what drove the score — cards fitting its
+  colours, plus any tribal/theme/keyword signal.
 - **Export** the current list via "Copy list" or "Download .txt".
 - **Dismiss** individual suggestions (restorable) and page through the rest.
 
