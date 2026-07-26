@@ -62,19 +62,44 @@ body {
   padding: 3rem 1.5rem 4rem;
 }
 
+.app-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+.app-nav-brand {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+  color: var(--brass-bright);
+}
+
+.app-nav-link {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 8px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.app-nav-link:hover {
+  border-color: var(--brass);
+}
+
 .app-header {
   border-bottom: 1px solid var(--ink-border);
   padding-bottom: 2rem;
   margin-bottom: 2.5rem;
-}
-
-.app-eyebrow {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.75rem;
-  color: var(--brass-bright);
-  margin: 0 0 0.75rem;
 }
 
 .app-title {
@@ -118,6 +143,37 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-muted);
+}
+
+.upload-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.upload-collapsed-summary {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.upload-collapse-toggle .explain-chevron {
+  margin-left: auto;
+  color: var(--brass);
+  font-size: 0.65rem;
+}
+
+.upload-collapsible {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
 }
 
 .upload-textarea {
@@ -936,6 +992,47 @@ body {
 
 .dialog-close:hover {
   color: var(--pip-r);
+}
+
+/* About dialog */
+
+.about-dialog-card {
+  /* No art strip like the card-detail dialog, so the body starts at the top. */
+  display: block;
+}
+
+.about-version {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-text-muted);
+  margin: 0.2rem 0 0;
+}
+
+.about-blurb {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin: 0.9rem 0 0;
+}
+
+.about-credits {
+  margin-top: 1rem;
+}
+
+.about-credits a {
+  color: #7a5615;
+}
+
+.about-caveat {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ink-text-muted);
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--parchment-dim);
+}
+
+.about-caveat a {
+  color: #7a5615;
 }
 
 /* Combo lookup */

@@ -107,39 +107,61 @@ way.
 
 ## File map
 
+This map is meant to stay current — update it in the same commit whenever
+you add or rename a file here, rather than letting it drift like it did for
+most of this project's early history.
+
 ```
-package.json          root convenience script (npm run dev via concurrently)
+package.json          root convenience script (npm run dev via concurrently); canonical app version
 render.yaml            Render Blueprint — provisions both services
 README.md              setup + usage instructions for a human
 DEPLOY.md              Render deployment walkthrough
+CHANGELOG.md            Keep a Changelog + SemVer — bump this and the version together
 
-client/                Vite + React + TS + Zustand
-  vite.config.ts         dev-server proxy: /api -> localhost:4000
+client/                Vite + React + TS + Zustand + TanStack Query
+  vite.config.ts         dev-server proxy: /api -> localhost:4000; injects __APP_VERSION__
   .env.example            documents VITE_API_URL (blank in dev)
   src/
-    main.tsx, App.tsx     entry point / page shell
+    main.tsx, App.tsx     entry point / page shell / navbar
     index.css              design system: parchment/ink palette, mana pips
-    store/useAppStore.ts   rawList, result, isLoading, error
-    api/client.ts           fetchRecommendations() -> POST /api/recommend
+    store/useAppStore.ts   client state only: rawList, submittedList, dismissed
+    api/
+      client.ts             fetchRecommendations/fetchCombos, wakeServer, cold-start retry
+      queries.ts             TanStack Query hooks wrapping the above
+    lib/
+      mtg.ts                 WUBRG ordering, colour-identity naming (Dimir, Golgari, ...)
+      filters.ts              SuggestionFilters + matching logic (color/category/bracket/theme)
+      manaSymbols.ts           inlined SVG path data for the 6 mana glyphs
     types/index.ts          DTOs mirroring the server's response shape
     components/
-      CardListUpload.tsx     paste or upload .txt, submit
-      RecommendationResults.tsx  match summary + not-found list
-      CommanderCard.tsx        one suggestion: pips, badges, bracket note
+      CardListUpload.tsx        paste or upload .txt, submit; collapses after a load succeeds
+      RecommendationResults.tsx  filter bar + paginated suggestion grid
+      ResultFilters.tsx          color/color-category/bracket/theme filter controls
+      CommanderCard.tsx          one suggestion: pips, clamped oracle text, "why" disclosure
+      CardDetailDialog.tsx        full-card modal (art, mana cost, full text, Scryfall link)
+      ManaSymbol.tsx, ManaCost.tsx  render mana pips / a full cost string
+      ComboFinder.tsx             click-to-run Commander Spellbook lookup inside a suggestion
+      AboutDialog.tsx             version, credits, repo link
 
 server/                Express + TS + better-sqlite3
   src/
     index.ts               app entry; CORS via optional CLIENT_ORIGIN env var
-    db.ts                   SQLite connection + findCardsByNames / getCommanderCandidates
+    db.ts                   SQLite connection; findCardsByNames (incl. DFC face-name fallback),
+                             getCommanderCandidates
     types.ts                CardRow shape (mirrors the cards table)
-    routes/recommend.ts      POST /api/recommend — the only endpoint
+    routes/
+      recommend.ts            POST /api/recommend
+      combos.ts                POST /api/combos — proxies to Commander Spellbook, on request only
     services/
-      parseList.ts            decklist text -> [{name, quantity}]
+      parseList.ts            decklist text -> [{name, quantity}]; handles the major export formats
       synergy.ts               profile-building + commander scoring (the core logic)
       bracket.ts               Game-Changer-count -> Bracket estimate
+      spellbook.ts             Commander Spellbook adapter: cache, backoff, response normalisation
   scripts/
-    fetch-scryfall.ts        downloads current Oracle Cards bulk file from Scryfall's API
-    import-scryfall.ts       parses that file into server/data/cards.sqlite
+    fetch-scryfall.ts        downloads current Oracle Cards bulk file (skips if a recent copy exists)
+    import-scryfall.ts       parses that file into server/data/cards.sqlite + card_face_names
+    test-parse-list.ts        npm test — parser cases (node:assert via tsx)
+    test-spellbook.ts          npm test — Spellbook adapter cases, against a local mock
   data/                     gitignored; oracle-cards.json + cards.sqlite live here
 ```
 
@@ -176,17 +198,39 @@ server/                Express + TS + better-sqlite3
 
 - **`synergy.ts`** — the heart of the app.
   1. Builds a `CollectionProfile` from the matched cards: color-identity
-     counts, creature-type counts, and counts against ~12 hand-picked
-     oracle-text theme regexes (sacrifice, graveyard, +1/+1 counters,
-     tokens, artifacts, spellslinger, lifegain, draw, mill, aristocrats,
-     landfall, reanimation).
-  2. Scores every Commander-eligible, currently-legal card: requires
-     nonzero color-identity overlap AND at least one tribal/theme signal
-     (signal threshold: appears ≥2 times in the list) to even be
-     considered. Score = `coverageRatio * 50 + tribalMatches * 15 +
-     themeMatches * 10`.
+     counts, creature-type counts, keyword counts (from Scryfall's
+     `keywords` field — e.g. a Flying-heavy list), and counts against a set
+     of hand-picked oracle-text theme regexes (sacrifice, graveyard,
+     +1/+1 counters, tokens, artifacts, enchantments, planeswalkers,
+     equipment, auras, spellslinger, lifegain, draw, mill, death triggers,
+     landfall, reanimation, doublers/multipliers).
+  2. `ARCHETYPES` is a second layer on top of the theme list: a named label
+     (Aristocrats, Voltron) for a *combination* of themes, applied when a
+     candidate matches enough of the archetype's component theme keys.
+     Spellslinger is **not** in this layer — it's just the existing
+     `spellslinger` theme under its real name, since that already was the
+     archetype under a blander label; adding a parallel archetype for it
+     would just duplicate the same detection twice.
+  3. Scores every Commander-eligible, currently-legal card: requires
+     nonzero color-identity overlap AND at least one tribal/theme/keyword/
+     archetype signal (signal threshold: appears ≥2 times in the list) to
+     even be considered. Score = `coverageRatio * 50 + tribalMatches * 15 +
+     themeMatches * 10 + keywordMatches * 8 + archetypeMatches * 20`.
+  - Partner-family keywords (Partner, Partner with, Friends forever, Choose
+    a Background, Doctor's companion) are excluded from the shared-keyword
+    signal on purpose — they mean something structural about who can be
+    your commander, not a thematic pattern, and showing "Partner" as a
+    generic shared-keyword tag would read as a confused echo of whatever
+    dedicated Partner/Background handling lands later (see the note on that
+    below — it hasn't been built yet).
+  - Every signal here requires the *candidate's own text* to match too, not
+    just the profile. This is consistent but has a real cost for Voltron
+    specifically: a commander that's a great Voltron target purely on
+    stats (evasive, hard to remove) but whose own text never says
+    "equip"/"enchant"/"Aura" won't be flagged. Documented in the archetype's
+    own description string, not hidden.
   - This is intentionally a short, readable heuristic, not a combo/archetype
-    model — documented as a known limitation, not a bug to silently "fix"
+    *engine* — documented as a known limitation, not a bug to silently "fix"
     into something more complex without discussing it first.
 
 - **`bracket.ts`** — Bracket estimate is based *only* on Game Changer count
@@ -197,7 +241,16 @@ server/                Express + TS + better-sqlite3
   caveat is surfaced in the UI copy; keep it there if this logic changes.
 
 - **`db.ts`** — `isSeeded` check so the API returns a helpful 503 instead
-  of a raw SQL error if `npm run prepare-data` hasn't been run yet.
+  of a raw SQL error if `npm run prepare-data` hasn't been run yet. Also
+  the double-faced-card lookup: `findCardsByNames` tries the full card name
+  first, then falls back to a `card_face_names` table (built in
+  `import-scryfall.ts` for `transform`/`modal_dfc` layouts only) so a
+  decklist naming just one face — "Fable of the Mirror-Breaker" rather than
+  the full "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki" —
+  still matches. That table is checked for existence before use (via the
+  same `tableExists` helper `isSeeded` uses) so an old local database from
+  before this existed degrades to exact-match-only instead of crashing the
+  server on the first prepared statement.
 
 ## Known risk areas / things to verify
 
@@ -265,4 +318,33 @@ Untested end-to-end — see "Known risk areas" above.
 - No user accounts, saved lists, or deck history
 - No fuzzy/typo-tolerant card name matching
 - No combo detection for Bracket estimation
-- No EDHREC data of any kind, scraped or otherwise
+- No EDHREC data of any kind, scraped or otherwise — **see "Pending
+  decisions" below: the user has since asked about using EDHREC data
+  "in some way," which is in direct tension with this line as written.
+  Nothing has been implemented. Don't resolve that tension by assumption —
+  the user said they'd confirm how to proceed.**
+
+## Pending decisions — proposed, not implemented
+
+Two things were asked for and deliberately **not built** pending
+confirmation. If you're picking this project up, don't build either
+without checking the conversation history (or asking) first:
+
+- **Partner / Background / Friends Forever / Doctor's Companion support.**
+  A commander suggestion with a Partner-family ability should generate
+  paired suggestions (two cards as one commander unit), not just a solo
+  card. This needs `CommanderSuggestion`'s shape to change from one
+  `CardRow` to one-or-two, which touches scoring, the API response, and
+  card-display UI — real surgery, not an additive change like everything
+  else in this file. A detailed rules understanding and open questions
+  (solo-vs-pair display, unified vs. separate ranking, per-request vs.
+  precomputed pairing) were written up for confirmation before any of it
+  gets built.
+- **EDHREC integration.** See the non-goal above this — the last explicit
+  instruction on record was "do not scrape the EDHREC API," and that has
+  not been rescinded, just questioned. Proposed (not built): keep a
+  pluggable seam in the scoring pipeline for an external synergy signal,
+  and a generic `(source, subject, tag, value)`-shaped table if bulk data
+  ever needs storing — both additive, so they cost nothing if EDHREC
+  integration never happens, and don't presuppose which access method
+  (bulk file, live API, something else) gets chosen.

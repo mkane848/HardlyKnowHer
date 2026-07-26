@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { CardListUpload } from './components/CardListUpload';
 import { RecommendationResults } from './components/RecommendationResults';
+import { AboutDialog } from './components/AboutDialog';
 import { wakeServer } from './api/client';
 
 function App() {
@@ -10,8 +11,16 @@ function App() {
 
   return (
     <div className="app-shell">
+      <nav className="app-nav">
+        <span className="app-nav-brand">Commander? I Hardly Know 'Er</span>
+        <AboutDialog>
+          <button type="button" className="app-nav-link">
+            About
+          </button>
+        </AboutDialog>
+      </nav>
+
       <header className="app-header">
-        <p className="app-eyebrow">Commander Recommender</p>
         <h1 className="app-title">Find the Commander hiding in your collection</h1>
         <p className="app-subtitle">
           Paste or upload a card list. We'll look for synergies across it and suggest legal Commanders, each

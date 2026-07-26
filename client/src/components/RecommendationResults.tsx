@@ -32,7 +32,7 @@ export function RecommendationResults() {
     [suggestions, dismissed]
   );
   const filtered = useMemo(() => applyFilters(kept, filters), [kept, filters]);
-  const { brackets, themes } = useMemo(() => availableFilterValues(kept), [kept]);
+  const { brackets, themes, hasColorless, hasMulticolor } = useMemo(() => availableFilterValues(kept), [kept]);
 
   // TanStack Table is used headlessly here, purely for the pagination state
   // machine — page bounds, and resetting to page 1 when filtering changes the
@@ -100,6 +100,8 @@ export function RecommendationResults() {
             onChange={setFilters}
             availableBrackets={brackets}
             availableThemes={themes}
+            hasColorless={hasColorless}
+            hasMulticolor={hasMulticolor}
             shown={filtered.length}
             total={kept.length}
           />

@@ -8,6 +8,8 @@ interface Props {
   onChange: (filters: SuggestionFilters) => void;
   availableBrackets: string[];
   availableThemes: string[];
+  hasColorless: boolean;
+  hasMulticolor: boolean;
   shown: number;
   total: number;
 }
@@ -17,6 +19,8 @@ export function ResultFilters({
   onChange,
   availableBrackets,
   availableThemes,
+  hasColorless,
+  hasMulticolor,
   shown,
   total,
 }: Props) {
@@ -49,6 +53,34 @@ export function ResultFilters({
         </ToggleGroup.Root>
         <span className="filter-hint">shows commanders playable in the selected colors</span>
       </div>
+
+      {(hasColorless || hasMulticolor) && (
+        <div className="filter-row">
+          <span className="filter-label" id="filter-color-category-label">
+            Type
+          </span>
+          <ToggleGroup.Root
+            type="single"
+            className="toggle-group"
+            aria-labelledby="filter-color-category-label"
+            value={filters.colorCategory ?? ''}
+            onValueChange={(value) =>
+              onChange({ ...filters, colorCategory: value === '' ? null : (value as 'colorless' | 'multicolor') })
+            }
+          >
+            {hasColorless && (
+              <ToggleGroup.Item value="colorless" className="toggle-chip">
+                Colorless
+              </ToggleGroup.Item>
+            )}
+            {hasMulticolor && (
+              <ToggleGroup.Item value="multicolor" className="toggle-chip">
+                Multicolor
+              </ToggleGroup.Item>
+            )}
+          </ToggleGroup.Root>
+        </div>
+      )}
 
       {availableBrackets.length > 1 && (
         <div className="filter-row">
@@ -100,7 +132,7 @@ export function ResultFilters({
           <button
             type="button"
             className="filter-clear"
-            onClick={() => onChange({ colors: [], brackets: [], themes: [] })}
+            onClick={() => onChange({ colors: [], colorCategory: null, brackets: [], themes: [] })}
           >
             Clear filters
           </button>

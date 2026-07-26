@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useRecommendations } from '../api/queries';
 
@@ -10,9 +10,21 @@ export function CardListUpload() {
 
   const [fileName, setFileName] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const panelId = useId();
 
   // Same cache entry the results section reads — no state passed between them.
-  const { isFetching } = useRecommendations(submittedList);
+  const { data, isFetching } = useRecommendations(submittedList);
+
+  // Collapse once a load finishes successfully, so the list stops taking up
+  // room once there's something more useful to look at. Keyed on `data`
+  // itself rather than `isFetching` going false, so a failed request (data
+  // stays undefined) leaves the list open to fix and resubmit, and re-editing
+  // the box afterward doesn't get yanked shut again until the *next* load
+  // actually completes.
+  useEffect(() => {
+    if (data) setCollapsed(true);
+  }, [data]);
 
   // A request that runs past a few seconds is almost always the free instance
   // waking up. Say so, rather than leaving a spinner to look like a hang.
@@ -42,45 +54,66 @@ export function CardListUpload() {
     submitList(rawList);
   }
 
+  const lineCount = rawList.split(/\r?\n/).filter((line) => line.trim()).length;
+
   return (
     <form className="upload-panel" onSubmit={handleSubmit}>
-      <label className="upload-label" htmlFor="card-list">
-        Your card list
-      </label>
-      <textarea
-        id="card-list"
-        className="upload-textarea"
-        placeholder={'1 Sol Ring\n1 Arcane Signet\n1 Rampant Growth\n1 Eternal Witness\n...'}
-        value={rawList}
-        onChange={(event) => setRawList(event.target.value)}
-        rows={12}
-        spellCheck={false}
-      />
-      {validationError && <p className="status-error">{validationError}</p>}
-      {slow && (
-        <p className="status-waking" aria-live="polite">
-          Waking the server — it sleeps after a spell of inactivity, so the first request can take up
-          to a minute.
-        </p>
-      )}
-      <div className="upload-actions">
-        <label className="file-button">
-          Upload .txt
-          <input
-            type="file"
-            accept=".txt,.csv"
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) handleFile(file);
-            }}
+      <button
+        type="button"
+        className="upload-collapse-toggle"
+        aria-expanded={!collapsed}
+        aria-controls={panelId}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <span className="upload-label">Your card list</span>
+        {collapsed && lineCount > 0 && (
+          <span className="upload-collapsed-summary">
+            {lineCount} line{lineCount === 1 ? '' : 's'} — click to edit
+          </span>
+        )}
+        <span aria-hidden="true" className="explain-chevron">
+          {collapsed ? '▼' : '▲'}
+        </span>
+      </button>
+
+      {!collapsed && (
+        <div id={panelId} className="upload-collapsible">
+          <textarea
+            id="card-list"
+            className="upload-textarea"
+            placeholder={'1 Sol Ring\n1 Arcane Signet\n1 Rampant Growth\n1 Eternal Witness\n...'}
+            value={rawList}
+            onChange={(event) => setRawList(event.target.value)}
+            rows={12}
+            spellCheck={false}
           />
-        </label>
-        {fileName && <span className="file-name">{fileName}</span>}
-        <button type="submit" className="primary-button" disabled={isFetching}>
-          {isFetching ? 'Finding synergies…' : 'Suggest Commanders'}
-        </button>
-      </div>
+          {validationError && <p className="status-error">{validationError}</p>}
+          {slow && (
+            <p className="status-waking" aria-live="polite">
+              Waking the server — it sleeps after a spell of inactivity, so the first request can take up
+              to a minute.
+            </p>
+          )}
+          <div className="upload-actions">
+            <label className="file-button">
+              Upload .txt
+              <input
+                type="file"
+                accept=".txt,.csv"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) handleFile(file);
+                }}
+              />
+            </label>
+            {fileName && <span className="file-name">{fileName}</span>}
+            <button type="submit" className="primary-button" disabled={isFetching}>
+              {isFetching ? 'Finding synergies…' : 'Suggest Commanders'}
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
