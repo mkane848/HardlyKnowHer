@@ -9,6 +9,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-07-26
+
 ### Changed
 
 - Submitted lists are now read as a legal Commander deck rather than as a
@@ -20,7 +22,6 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   no longer pass for three different cards supporting a theme. Anything
   trimmed is reported as "N extra copies ignored" beside the matched
   count.
-
 - A theme, tribe, or keyword now needs at least **three** supporting cards
   to count, measured after narrowing to that commander's own colour
   identity. Below that it is dropped from the recommendation engine
