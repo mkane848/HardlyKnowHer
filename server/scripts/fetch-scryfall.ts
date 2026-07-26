@@ -36,8 +36,10 @@ function existingFileIsFresh(): { fresh: boolean; ageHours: number; sizeMb: stri
 // them. The User-Agent must identify this app specifically — they flag the
 // defaults HTTP libraries send (Node's built-in fetch included) as junk
 // traffic. See https://scryfall.com/docs/api
+// Kept in sync with services/spellbook.ts's User-Agent by hand — see the
+// note there on why it isn't read from package.json.
 const SCRYFALL_HEADERS = {
-  'User-Agent': 'MtgCommanderRecommender/0.1.0',
+  'User-Agent': 'CommanderIHardlyKnowEr/1.0.0 (hobby project; https://github.com/mkane848/HardlyKnowHer)',
   Accept: 'application/json;q=0.9,*/*;q=0.8',
 };
 

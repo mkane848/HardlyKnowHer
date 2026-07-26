@@ -20,10 +20,14 @@ const REQUEST_TIMEOUT_MS = 12_000;
 const CACHE_TTL_MS = 60 * 60 * 1000; // an hour; combo data changes slowly
 const MAX_CARDS = 250; // a Commander deck is 100; this is a sanity bound
 
+// Not read from package.json: that file sits outside src/'s rootDir (see the
+// note in tsconfig.build.json), so importing it here would reintroduce the
+// same __dirname/rootDir mismatch that already broke a deploy once. Bump the
+// version by hand when package.json's version changes.
 const HEADERS = {
   'Content-Type': 'application/json',
   Accept: 'application/json',
-  'User-Agent': 'MtgCommanderRecommender/0.1.0 (hobby project)',
+  'User-Agent': 'CommanderIHardlyKnowEr/1.0.0 (hobby project; https://github.com/mkane848/HardlyKnowHer)',
 };
 
 export interface ComboResult {

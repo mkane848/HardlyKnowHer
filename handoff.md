@@ -1,48 +1,73 @@
-# Handoff: Commander Recommender
+# Handoff: Commander? I Hardly Know 'Er
 
 A personal/hobby project (not work-related) — keep solutions simple and
 maintainable for a solo developer. This document exists so a fresh agent
 session (e.g. Claude Code) has full context without re-deriving decisions
-already made in the design conversation.
+already made in the design conversation. It has been updated across many
+sessions since the project started — if something here looks inconsistent
+with the actual code, the code wins; open an issue with the mismatch (or
+just fix this file) rather than trusting a stale paragraph.
 
 ## What this is
 
 A web app: upload a list of Magic: The Gathering cards, and it recommends
-legal Commanders based on synergies found within that list (or subsets of
-it). Every suggestion is checked against the current Commander ban list and
-tagged with an estimated power Bracket (1–5, per Wizards' Bracket System).
+legal Commanders — including Partner/Background pairs, not just solo cards
+— based on synergies found within that list. Every suggestion is checked
+against the current Commander ban list and tagged with an estimated power
+Bracket (1–5, per the Commander Format Rules Committee's Bracket System).
+See `README.md` for the user-facing feature list; this file is the deeper
+"why," aimed at whoever (human or agent) picks this codebase up next.
 
 ## Status at handoff — read this first
 
-**Nothing in this project has actually been run yet.** It was built in a
-sandboxed environment with no network access, so:
+This is a working, previously-deployed app (`v1.0.0` was tagged, and
+Partner/Background support plus several UX features have shipped since —
+see `CHANGELOG.md`). It is not a fresh scaffold: `npm install`, real
+Scryfall data, `npm run dev`, and a real decklist have all been run and
+verified working, repeatedly, across many prior sessions. Don't assume the
+opposite just because a *specific* environment happens to lack
+`node_modules/` or network access at any given moment — that's a property
+of the sandbox you're in right now, not of the project's maturity.
 
-- `npm install` has never been run (no `node_modules` anywhere)
-- The Scryfall card data has never been downloaded or imported — `server/data/`
-  is empty except a `.gitkeep`
-- The app has never been started; client and server have never talked to
-  each other
-- The Render deployment has never been exercised
+**What every session should still verify for itself**, since the exact
+state of the environment you're in is never guaranteed: whether
+dependencies are installed, whether `server/data/cards.sqlite` exists and is
+seeded, and whether the app actually starts. `git status` and a quick
+`ls server/data/` answer most of this in seconds.
 
-What *has* been done: every `.ts`/`.tsx` file was checked with `tsc --noEmit`
-in isolation and came back clean (the only errors were the expected "cannot
-find module" noise from uninstalled dependencies — no logic/syntax errors).
-That's a much weaker guarantee than actually running it.
-
-### Immediate next steps
+### Getting oriented in a fresh session
 
 1. `npm install` at the repo root, then `npm run install:all` (installs
    `server/` and `client/` separately). Watch for `better-sqlite3` failing to
    fetch/build its native binary — see "Known risk areas" below.
-2. Get card data: `cd server && npm run prepare-data` (fetches the current
-   Scryfall Oracle Cards bulk file and imports it into SQLite). Needs
-   network; takes a few minutes.
+2. Get card data if `server/data/cards.sqlite` doesn't already exist:
+   `cd server && npm run prepare-data` (fetches the current Scryfall Oracle
+   Cards bulk file and imports it into SQLite). Needs network; takes a few
+   minutes. If the sandbox has no network access to Scryfall, hand-build a
+   small fixture database instead (see "Verifying without network access"
+   below) rather than treating the feature as unverifiable.
 3. `npm run dev` at the root. Confirm the server comes up on `:4000` and the
    client on `:5173`, and that `http://localhost:5173` loads.
-4. Paste a real decklist in and confirm you get back sane-looking Commander
-   suggestions, not just that the request succeeds.
-5. Fix whatever breaks — this is the first real execution of this code, so
-   treat it as unverified until step 4 passes.
+4. Run `npm test` in both `server/` and `client/` — fast, dependency-free,
+   and the first thing to catch a regression before you go looking by hand.
+5. If you changed anything user-visible, paste a real decklist in (or your
+   fixture DB's cards) and confirm you get back sane-looking suggestions —
+   passing tests and a clean typecheck are necessary, not sufficient.
+
+### Verifying without network access
+
+Scryfall and Commander Spellbook are both frequently unreachable from a
+sandboxed session (see "Known risk areas" for the exact symptom). That is
+not a reason to skip verification — hand-build a small SQLite fixture
+matching the `cards` table schema in `server/scripts/import-scryfall.ts`
+(a handful of realistic rows covering whatever you're testing), point the
+dev server at it, and hit `/api/recommend` / `/api/combos` directly with
+`curl`, or drive the real UI with Playwright (pre-installed in this
+environment — see the system prompt for how to launch it). This is how
+Partner/Background pairing and the merge-reconciliation work in this file
+were both verified when Scryfall wasn't reachable. Delete the fixture DB
+and any throwaway scripts before finishing — `server/data/` should stay
+empty (just `.gitkeep`) in the committed tree.
 
 ## Tech stack & why
 
@@ -118,7 +143,7 @@ README.md              setup + usage instructions for a human
 DEPLOY.md              Render deployment walkthrough
 CHANGELOG.md            Keep a Changelog + SemVer — bump this and the version together
 
-client/                Vite + React + TS + Zustand + TanStack Query
+client/                Vite + React + TS + Zustand + TanStack Query/Table
   vite.config.ts         dev-server proxy: /api -> localhost:4000; injects __APP_VERSION__
   .env.example            documents VITE_API_URL (blank in dev)
   src/
@@ -131,22 +156,36 @@ client/                Vite + React + TS + Zustand + TanStack Query
     lib/
       mtg.ts                 WUBRG ordering, colour-identity naming (Dimir, Golgari, ...)
       filters.ts              SuggestionFilters + matching logic (color/category/bracket/theme)
+      sort.ts                 SortMode ('relevance' | 'colorNameValue'); compares a unit's
+                               joined display name and summed mana value across its 1-2 cards
+      suggestions.ts           "still has supporting cards after the identity filter" helpers
+                               (visibleThemeSupport/visibleTribeSupport/visibleKeywordSupport)
+                               shared by the card display and the filter bar's option lists
       manaSymbols.ts           inlined SVG path data for the 6 mana glyphs
     types/index.ts          DTOs mirroring the server's response shape — a suggestion is
                              `{ unitId, cards: CommanderCardDTO[], colorIdentity, ... }`, one-or-two
                              cards per unit, not a single flattened card
     components/
       CardListUpload.tsx        paste or upload .txt, submit; collapses after a load succeeds
-      RecommendationResults.tsx  filter bar + paginated suggestion grid
-      ResultFilters.tsx          color/color-category/bracket/theme filter controls
+      RecommendationResults.tsx  filter bar + sort + export controls + paginated suggestion grid
+      ResultFilters.tsx          color/color-category/bracket/theme filter controls + sort dropdown
       CommanderCard.tsx          one suggestion: pips, one `CommanderFace` per card (1 or 2),
-                                  "why" disclosure
-      CardDetailDialog.tsx        full-card modal for one card of a unit (art, mana cost, full
-                                   text, Scryfall link); takes `card` + the unit's shared `bracket`
+                                  "why" disclosure; art wrapped in CardImageDialog per face
+      CardDetailDialog.tsx        full rules-text modal for one card of a unit (art, mana cost,
+                                   full text, Scryfall link); takes `card` + the unit's `bracket`
+      CardImageDialog.tsx         whole-card art-only preview (no rules text) — separate from
+                                   CardDetailDialog above; used for commander art and every
+                                   cited supporting card's name
       ManaSymbol.tsx, ManaCost.tsx  render mana pips / a full cost string
       ComboFinder.tsx             click-to-run Commander Spellbook lookup inside a suggestion;
                                    takes `commanderNames: string[]` (1 or 2) for pair support
       AboutDialog.tsx             version, credits, repo link
+  scripts/                 npm test — dependency-free node:assert + tsx, no framework
+    fixtures.ts               makeSuggestion/makeCommanderCard/makeSupportingCard test builders
+    test-mtg.ts                WUBRG ordering + colour-identity naming cases
+    test-suggestions.ts         "still has supporting cards" filter cases
+    test-filters.ts             SuggestionFilters matching + availableFilterValues cases
+    test-sort.ts                sort mode ordering cases, incl. Partner-pair name/mana-value ties
 
 server/                Express + TS + better-sqlite3
   src/
@@ -174,8 +213,14 @@ server/                Express + TS + better-sqlite3
                              (rule 702.124) from oracle text
     test-parse-list.ts        npm test — parser cases (node:assert via tsx)
     test-spellbook.ts          npm test — Spellbook adapter cases, against a local mock
+    test-bracket.ts             npm test — Bracket-estimate cases
   data/                     gitignored; oracle-cards.json + cards.sqlite live here
 ```
+
+`partners.ts`/`synergy.ts` have no automated test coverage yet (see the
+"Merged with main's independent Partner/Background work" section below for
+why — main's equivalent tests covered its own, discarded API and couldn't
+be ported). Worth writing before either file changes again.
 
 ## Core logic, summarized (read the files for full detail)
 
@@ -313,19 +358,15 @@ server/                Express + TS + better-sqlite3
   new Scryfall calls anywhere, send them there too.
 - **`render.yaml`'s `fromService`/`property: host` syntax** for wiring the
   client's `VITE_API_URL` to the server's URL was written from Render's
-  current Blueprint docs but has never actually been deployed. If the
-  Blueprint fails to sync, this is the first thing to check.
+  Blueprint docs. If the Blueprint fails to sync on a fresh deploy, this is
+  the first thing to check.
 - **Card name matching is exact (case-insensitive) only** — no fuzzy
-  matching. Real decklists will likely have some near-misses; worth seeing
-  how bad this is in practice before deciding whether it needs fixing.
-- **Double-faced cards only match by their full name.** The import stores
-  Scryfall's `name`, which for a DFC is `Malakir Rebirth // Malakir Mire`.
-  Sites that export both faces match fine, but any site exporting only the
-  front face (`Malakir Rebirth`) will miss. This is a matching question
-  rather than a parsing one — the fix would be indexing front-face names as
-  an alternate key in `import-scryfall.ts`/`db.ts`, not more regex work in
-  `parseList.ts`. Not done, since it's adjacent to the "no fuzzy matching"
-  non-goal and worth deciding on deliberately.
+  matching. Double-faced cards are the one exception: they match by either
+  face's name alone (see `card_face_names` in the Core logic section above),
+  not just the full combined name. Anything else — typos, alternate
+  shorthand names — comes back in the "not found" list. Real decklists will
+  likely have some near-misses; worth seeing how bad this is in practice
+  before deciding whether a fuzzy-match fallback is worth adding.
 - **The compiled build must keep `src/` as its root.** `db.ts` finds the
   card database with `path.join(__dirname, '..', 'data')`, which only
   lands on `server/data` if the compiled `db.js` sits one level under
@@ -344,8 +385,9 @@ server/                Express + TS + better-sqlite3
 
 `render.yaml` + `DEPLOY.md` set up a free two-service deploy on Render
 (static frontend + Node backend), with the backend rebuilding its SQLite
-data from Scryfall on every deploy rather than using a persistent disk.
-Untested end-to-end — see "Known risk areas" above.
+data from Scryfall on every deploy rather than using a persistent disk. See
+`DEPLOY.md` for the walkthrough and "Known risk areas" above for the
+specific failure modes that have bitten a deploy before.
 
 ## Explicit non-goals for v1 (don't scope-creep these back in without asking)
 
