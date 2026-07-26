@@ -4,6 +4,7 @@ import { parseCardList } from '../services/parseList';
 import { buildCollectionProfile, scoreCommanders, type OwnedCard } from '../services/synergy';
 import { buildCommanderUnits, unitKey } from '../services/partners';
 import { estimateBracket } from '../services/bracket';
+import { applySingletonLimits } from '../services/singleton';
 
 const router = Router();
 
@@ -42,17 +43,22 @@ router.post('/recommend', (req, res) => {
   const parsed = parseCardList(list);
   const nameMap = findCardsByNames(parsed.map((p) => p.name));
 
-  const owned: OwnedCard[] = [];
+  const submitted: OwnedCard[] = [];
   const notFound: string[] = [];
 
   for (const entry of parsed) {
     const row = nameMap.get(entry.name.toLowerCase());
     if (row) {
-      owned.push({ row, quantity: entry.quantity });
+      submitted.push({ row, quantity: entry.quantity });
     } else {
       notFound.push(entry.name);
     }
   }
+
+  // Recommend against a legal Commander deck, not the raw paste. A list
+  // exported from a collection can hold several copies of a card, and
+  // counting them all would let one card stand in for a whole strategy.
+  const { owned, ignoredCopies } = applySingletonLimits(submitted);
 
   const profile = buildCollectionProfile(owned);
   const candidates = getCommanderCandidates();
@@ -99,8 +105,13 @@ router.post('/recommend', (req, res) => {
   });
 
   res.json({
+    // What was submitted, versus what was actually scored. These differ by
+    // the cards we could not find *and* the copies the format does not
+    // allow, so `ignoredCopies` is reported alongside rather than folded in
+    // — otherwise a legal-but-trimmed list would look like a failed lookup.
     totalParsed: parsed.reduce((sum, p) => sum + p.quantity, 0),
     totalMatched: owned.reduce((sum, c) => sum + c.quantity, 0),
+    ignoredCopies,
     notFound,
     suggestions,
   });

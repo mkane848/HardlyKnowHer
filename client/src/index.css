@@ -486,7 +486,8 @@ body {
   margin-left: 0.5rem;
 }
 
-.dismissed-note {
+.dismissed-note,
+.singleton-note {
   font-size: 0.85rem;
   color: var(--text-muted);
 }

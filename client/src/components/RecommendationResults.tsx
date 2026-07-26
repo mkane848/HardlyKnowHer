@@ -125,6 +125,15 @@ export function RecommendationResults() {
         <span>
           {result.totalMatched} of {result.totalParsed} cards matched
         </span>
+        {/* Called out separately from "not found": these cards were
+            recognised, they just cannot all be in one deck. Without this the
+            matched count would look like a failed lookup. */}
+        {result.ignoredCopies > 0 && (
+          <span className="singleton-note">
+            {result.ignoredCopies} extra {result.ignoredCopies === 1 ? 'copy' : 'copies'} ignored — Commander is
+            singleton
+          </span>
+        )}
         {result.notFound.length > 0 && (
           <details>
             <summary>{result.notFound.length} not found</summary>

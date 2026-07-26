@@ -85,6 +85,8 @@ export interface ComboLookupResponse {
 export interface RecommendResponse {
   totalParsed: number;
   totalMatched: number;
+  /** Copies dropped because Commander is singleton — see services/singleton.ts. */
+  ignoredCopies: number;
   notFound: string[];
   suggestions: CommanderSuggestionDTO[];
 }
