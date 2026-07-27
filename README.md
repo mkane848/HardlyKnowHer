@@ -31,6 +31,13 @@ a pile of Humans says nothing about him. A commander does not have to *be* the
 type it cares about, since Ghoulcaller Gisa is a Human Wizard and one of the
 best Zombie commanders in the format.
 
+**On Sacrifice specifically:** the pattern requires an indefinite object —
+"sacrifice **a** creature", "sacrifice **another** artifact", "sacrifice
+**it**" — not just the bare word. A fetch land's own text reads "Sacrifice
+Arid Mesa: …": it sacrifices only itself, by name, as the cost for an
+unrelated effect, which reads nothing like the creature-sacrifice archetype
+even though "sacrifice" appears in it.
+
 **On what scoring rewards:** a commander is scored on how *focused* a fit it
 is, not how much of your list it can legally cast. Each signal counts for the
 share of that commander's playable cards standing behind it, so a mono-black
@@ -183,14 +190,21 @@ thins out to one or two cards once narrowed to this commander's own colours
 isn't a real pattern, so it's dropped entirely rather than shown as a weak
 reason.
 
-Tapping a commander's art, or any cited card's name, opens that card at its
-own proportions. The rules-text box on the card face opens a fuller detail
-view (mana cost, power/toughness, a link to the card on Scryfall).
+Each cited card's name shows its art on hover (or on tap, on a touch screen)
+without leaving the list, and its mana value alongside the name. Tapping a
+commander's own art, or any cited card's name, opens that card at its own
+proportions. The rules-text box on the card face opens a fuller detail view
+(mana cost, power/toughness, a link to the card on Scryfall).
 
 Inside the "why" panel, **"Find combos"** asks
 [Commander Spellbook](https://commanderspellbook.com/) which combos the
 commander (or commander pair) makes with your cards, and shows both the ones
-you can already assemble and the ones you're a card or two short of.
+you can already assemble and the ones you're a card or two short of. A
+commander with a lot of combo pieces in your list can turn up more combos
+than comfortably fit on screen, so each result group pages independently
+(with a "Show N per page" control, remembered for next time), and the whole
+results block can be collapsed back down without losing what was found —
+reopening it doesn't ask Commander Spellbook again.
 
 That lookup only ever runs when you click it — browsing suggestions sends
 nothing to Commander Spellbook. Results are cached server-side for an hour,
@@ -222,6 +236,9 @@ and `handoff.md` for the plan.
   keyword signals it matched, and the pool they were weighed against.
 - **Export** the current list via "Copy list" or "Download .txt".
 - **Dismiss** individual suggestions (restorable) and page through the rest.
+  There's no cap on how many suggestions can come back — every commander
+  that clears the matching bar is included — so how many show per page is
+  yours to set via the "Show" control, and it's remembered for next time.
 
 ## Data sources
 

@@ -9,6 +9,35 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Added
+
+- No cap on how many commanders can be suggested — every candidate that
+  clears the matching bar comes back, not just the top 30. How many show
+  per page is now yours to set via a "Show" control next to Sort, and the
+  choice is remembered for next time.
+- Each cited card's name in "Why this commander?" shows its art on hover
+  (or on tap, on a touch screen) without leaving the list, and its mana
+  value alongside the name.
+- Commander Spellbook combo results — "Ready to go" and "Almost there" —
+  now page independently instead of listing everything found at once, with
+  their own "Show N per page" control. The whole results block can be
+  collapsed back down after fetching without losing what was found;
+  reopening it doesn't ask Commander Spellbook again.
+
+### Fixed
+
+- The Sacrifice theme required only the bare word "sacrifice" anywhere in a
+  card's text, so every fetch land in the format counted toward
+  creature-sacrifice synergy — a fetch land's own text reads "Sacrifice
+  Arid Mesa: …", sacrificing only itself, by name, as the cost for an
+  unrelated effect. The pattern now requires an indefinite object right
+  after the word ("sacrifice **a** creature", "sacrifice **another**
+  artifact", "sacrifice **it**"), which a self-referential cost never has.
+- "Card Draw" is no longer detected as its own theme. Almost every deck
+  draws cards somehow, so it was adding a "Themes: Card Draw" tag to
+  nearly anything capable of drawing one rather than pointing at an actual
+  pattern in the list.
+
 ## [1.3.0] — 2026-07-27
 
 ### Added
