@@ -65,6 +65,20 @@ function nextModeDescription(current: FilterMode | null): string {
   return 'excluded — click to clear';
 }
 
+/**
+ * Colours read differently from every other facet, so they get their own
+ * wording. Including Bracket 3 or a theme *requires* it; including White does
+ * not require white, it permits it — a commander shows when its whole colour
+ * identity fits inside what you have allowed. Picking White and Black is the
+ * Orzhov question ("what could I build here?"), which is why mono-black still
+ * appears, and why calling this "require" was actively misleading.
+ */
+function nextColorModeDescription(current: FilterMode | null): string {
+  if (current === null) return 'not filtered — click to allow this colour';
+  if (current === 'include') return 'allowed — click to exclude it instead';
+  return 'excluded — click to clear';
+}
+
 export function ResultFilters({
   filters,
   onChange,
@@ -99,8 +113,8 @@ export function ResultFilters({
                 type="button"
                 className={`toggle-pip toggle-pip-${mode ?? 'off'}`}
                 onClick={() => updateFacet('colors', cycleSelection(filters.colors, color))}
-                aria-label={`${name}: ${nextModeDescription(mode)}`}
-                title={`${name}: ${nextModeDescription(mode)}`}
+                aria-label={`${name}: ${nextColorModeDescription(mode)}`}
+                title={`${name}: ${nextColorModeDescription(mode)}`}
               >
                 <ManaSymbol color={color} decorative />
               </button>
@@ -123,7 +137,7 @@ export function ResultFilters({
             />
           )}
         </div>
-        <span className="filter-hint">click once to require, again to exclude</span>
+        <span className="filter-hint">click to allow a colour, again to exclude — results fit within the allowed colours</span>
       </div>
 
       {availableBrackets.length > 1 && (
