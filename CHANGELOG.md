@@ -9,6 +9,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-07-27
+
 ### Added
 
 - No cap on how many commanders can be suggested — every candidate that
