@@ -70,7 +70,8 @@ export function AboutDialog({ children }: { children: ReactNode }) {
               </dl>
 
               <p className="about-caveat">
-                Bracket estimates are a heuristic based on Game Changer count, not an official ruling — see the{' '}
+                Suggestions come from card text, keywords and creature types — a heuristic, not a model of how a
+                deck actually plays. See the{' '}
                 <a href={`${REPO_URL}/blob/main/CHANGELOG.md`} target="_blank" rel="noreferrer noopener">
                   changelog
                 </a>{' '}

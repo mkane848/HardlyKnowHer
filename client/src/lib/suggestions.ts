@@ -3,7 +3,7 @@ import type { CommanderSuggestionDTO, KeywordSupportDTO, ThemeSupportDTO, Kindre
 /**
  * A theme or kindred type can be "matched" against the collection as a whole, but
  * once support cards are filtered down to ones that actually fit this
- * specific commander's colour identity, none may be left — e.g. the list has
+ * specific commander's color identity, none may be left — e.g. the list has
  * two Goblins, but they're red and this commander is mono-blue. That isn't a
  * real reason to suggest the commander, so it shouldn't be shown as one.
  *
@@ -29,7 +29,7 @@ export function visibleKindredTypes(suggestion: CommanderSuggestionDTO): string[
 }
 
 // Keywords have the same "matched globally, empty once filtered to this
-// commander's colour identity" problem as themes and kindred above — there's
+// commander's color identity" problem as themes and kindred above — there's
 // no equivalent on main, since its synergy scoring dropped keyword support.
 export function visibleKeywordSupport(suggestion: CommanderSuggestionDTO): KeywordSupportDTO[] {
   return suggestion.keywordSupport.filter((keyword) => keyword.cards.length > 0);

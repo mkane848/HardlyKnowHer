@@ -1,5 +1,5 @@
 /**
- * Tests for WUBRG colour ordering and identity naming. Run with: npm test
+ * Tests for WUBRG color ordering and identity naming. Run with: npm test
  *
  * Dependency-free (node:assert + tsx), matching the server's test scripts —
  * these are the two conventions players notice immediately if they slip:
@@ -20,7 +20,7 @@ function check(label: string, fn: () => void) {
   }
 }
 
-check('sortWubrg puts colours in WUBRG order regardless of input order', () => {
+check('sortWubrg puts colors in WUBRG order regardless of input order', () => {
   assert.deepStrictEqual(sortWubrg(['G', 'R', 'B', 'U', 'W']), ['W', 'U', 'B', 'R', 'G']);
   assert.deepStrictEqual(sortWubrg(['B', 'W']), ['W', 'B']);
 });
@@ -36,7 +36,7 @@ check('COLOR_ORDER ranks W < U < B < R < G', () => {
   }
 });
 
-check('identityName covers mono, guild, shard/wedge and five-colour identities', () => {
+check('identityName covers mono, guild, shard/wedge and five-color identities', () => {
   assert.strictEqual(identityName([]), 'Colorless');
   assert.strictEqual(identityName(['U']), 'Mono-Blue');
   assert.strictEqual(identityName(['B', 'U']), 'Dimir'); // order-independent input
@@ -44,7 +44,7 @@ check('identityName covers mono, guild, shard/wedge and five-colour identities',
   assert.strictEqual(identityName(['W', 'U', 'B', 'R', 'G']), 'Five-Color');
 });
 
-check('identityName falls back to a colour count for an identity outside WUBRG', () => {
+check('identityName falls back to a color count for an identity outside WUBRG', () => {
   // Not a real Magic identity — pins the fallback branch for whatever
   // wouldn't resolve to a named combination.
   assert.strictEqual(identityName(['W', 'W']), '2-Color');

@@ -12,6 +12,9 @@ export interface SupportingCardDTO {
   isGameChanger: boolean;
   manaValue: number | null;
   imageUri: string | null;
+  /** Second face of a transform/modal DFC, for the art preview's flip control. */
+  backImageUri: string | null;
+  backName: string | null;
   scryfallUri: string | null;
 }
 
@@ -37,6 +40,9 @@ export interface CommanderCardDTO {
   oracleId: string;
   name: string;
   imageUri: string | null;
+  /** Second face of a transform/modal DFC — null for single-faced cards. */
+  backImageUri: string | null;
+  backName: string | null;
   colorIdentity: string[];
   typeLine: string | null;
   oracleText: string | null;

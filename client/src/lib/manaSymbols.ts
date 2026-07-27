@@ -1,17 +1,17 @@
 /**
  * Mana symbol glyphs, inlined.
  *
- * These are the six colour symbols from the mana-font package (MIT, Andrew
+ * These are the six color symbols from the mana-font package (MIT, Andrew
  * Gioia), extracted as raw path data rather than loaded as a webfont. The
  * font's stylesheet offers no woff2, so browsers would download a ~408KB
  * .woff — plus an unused body-text face — to render six pips. The paths
  * below are about 12KB of markup that gzips to a fraction of that.
  *
- * Each path is the glyph only; the coloured disc behind it is CSS (.pip-*),
+ * Each path is the glyph only; the colored disc behind it is CSS (.pip-*),
  * which is also how the original font works.
  *
  * To update: re-extract from node_modules/mana-font/svg/{w,u,b,r,g,c}.svg,
- * dropping the baked-in fill so CSS controls the colour.
+ * dropping the baked-in fill so CSS controls the color.
  */
 
 /** Glyph path data, on a 32x32 viewBox. */

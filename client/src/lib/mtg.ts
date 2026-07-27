@@ -1,12 +1,12 @@
 /**
  * Magic-specific presentation conventions.
  *
- * Two things players expect from any tool that shows colours, and notice
+ * Two things players expect from any tool that shows colors, and notice
  * immediately when they're missing:
  *
- *   1. Colours are always listed in WUBRG order, never alphabetically and
+ *   1. Colors are always listed in WUBRG order, never alphabetically and
  *      never in whatever order the data happened to arrive in.
- *   2. A colour combination is named, not spelled out. "Golgari" reads
+ *   2. A color combination is named, not spelled out. "Golgari" reads
  *      faster than "Black/Green" to anyone who plays the format.
  */
 
@@ -24,7 +24,7 @@ export const COLOR_LABELS: Record<string, string> = {
 };
 
 /**
- * Sorts a colour identity into WUBRG order.
+ * Sorts a color identity into WUBRG order.
  *
  * Scryfall generally returns identities already sorted, but this app also
  * builds them from filter state and user input, so normalise rather than
@@ -36,7 +36,7 @@ export function sortWubrg(colors: string[]): string[] {
 }
 
 // Guild (2), shard/wedge (3), and Nephilim (4) names, keyed by WUBRG-sorted
-// identity. These are the names players actually use for a colour pair.
+// identity. These are the names players actually use for a color pair.
 const IDENTITY_NAMES: Record<string, string> = {
   '': 'Colorless',
   W: 'Mono-White',
@@ -76,7 +76,7 @@ const IDENTITY_NAMES: Record<string, string> = {
   WUBRG: 'Five-Color',
 };
 
-/** e.g. ['B','U'] -> "Dimir". Falls back to a colour count if unnamed. */
+/** e.g. ['B','U'] -> "Dimir". Falls back to a color count if unnamed. */
 export function identityName(colors: string[]): string {
   const key = sortWubrg(colors).join('');
   return IDENTITY_NAMES[key] ?? `${colors.length}-Color`;

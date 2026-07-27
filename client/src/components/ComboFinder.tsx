@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { usePreferencesStore, COMBOS_PAGE_SIZE_OPTIONS } from '../store/usePreferencesStore';
 import { useCombos } from '../api/queries';
+import { Pagination } from './Pagination';
 import type { ComboDTO } from '../types';
 
 /**
@@ -59,29 +60,12 @@ function ComboList({ combos, showMissing, pageSize }: { combos: ComboDTO[]; show
         ))}
       </ul>
 
-      {pageCount > 1 && (
-        <nav className="pagination" aria-label="Combo pages">
-          <button
-            type="button"
-            className="page-button"
-            onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
-            disabled={clampedIndex === 0}
-          >
-            ← Previous
-          </button>
-          <span className="page-status" aria-live="polite">
-            Page {clampedIndex + 1} of {pageCount}
-          </span>
-          <button
-            type="button"
-            className="page-button"
-            onClick={() => setPageIndex((i) => Math.min(pageCount - 1, i + 1))}
-            disabled={clampedIndex >= pageCount - 1}
-          >
-            Next →
-          </button>
-        </nav>
-      )}
+      <Pagination
+        pageIndex={clampedIndex}
+        pageCount={pageCount}
+        onPageChange={setPageIndex}
+        label="Combo pages"
+      />
     </>
   );
 }
@@ -133,7 +117,7 @@ export function ComboFinder({ commanderNames }: { commanderNames: string[] }) {
         <>
           <p className="explain-group-desc">
             Check Commander Spellbook for combos between this commander and the cards in your list that
-            fit its colour identity.
+            fit its color identity.
           </p>
           <div className="combo-button-row">
             <button type="button" className="combo-button" onClick={() => setRequested(true)}>

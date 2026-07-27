@@ -7,6 +7,9 @@ import type { BracketEstimateDTO, CommanderCardDTO } from '../types';
 
 interface Props {
   card: CommanderCardDTO;
+  /** Currently unused: the Bracket estimate row is hidden while the
+   * calculation is reworked. Kept on the props (and still passed by every
+   * caller) so restoring that row is a one-line change. */
   bracket: BracketEstimateDTO;
   children: ReactNode;
 }
@@ -23,7 +26,7 @@ interface Props {
  * prices and legality across every format are all a click away on the real
  * page, which this links to rather than approximating badly.
  */
-export function CardDetailDialog({ card, bracket, children }: Props) {
+export function CardDetailDialog({ card, children }: Props) {
   const { power, toughness } = card;
   const hasStats = power !== null && toughness !== null;
 
@@ -72,12 +75,9 @@ export function CardDetailDialog({ card, bracket, children }: Props) {
                   <dt>Commander</dt>
                   <dd>Legal{card.isGameChanger ? ' · Game Changer' : ''}</dd>
                 </div>
-                <div>
-                  <dt>Bracket estimate</dt>
-                  <dd>
-                    {bracket.range} — {bracket.label}
-                  </dd>
-                </div>
+                {/* Bracket estimate hidden alongside the badge on each card
+                    while the calculation is being reworked. `bracket` stays
+                    on the props so restoring this needs no re-plumbing. */}
               </dl>
 
               {card.scryfallUri && (

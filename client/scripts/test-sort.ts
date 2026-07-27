@@ -1,6 +1,6 @@
 /**
- * Tests for the "Colors, name, mana value" sort mode: fewest colours first,
- * WUBRG order within a colour count, then name, then mana value. Run with:
+ * Tests for the "Colors, name, mana value" sort mode: fewest colors first,
+ * WUBRG order within a color count, then name, then mana value. Run with:
  * npm test
  */
 import assert from 'node:assert';
@@ -29,7 +29,7 @@ check('relevance mode is a no-op that returns the same array reference', () => {
   assert.strictEqual(result, input);
 });
 
-check('fewest colours sorts before more colours', () => {
+check('fewest colors sorts before more colors', () => {
   const mono = makeSuggestion({ cards: [makeCommanderCard({ name: 'Mono' })], colorIdentity: ['U'] });
   const two = makeSuggestion({ cards: [makeCommanderCard({ name: 'Two' })], colorIdentity: ['U', 'B'] });
   const three = makeSuggestion({ cards: [makeCommanderCard({ name: 'Three' })], colorIdentity: ['U', 'B', 'R'] });
@@ -38,7 +38,7 @@ check('fewest colours sorts before more colours', () => {
   assert.deepStrictEqual(sorted.map(unitName), ['Mono', 'Two', 'Three']);
 });
 
-check('same colour count sorts by WUBRG order of the identity itself', () => {
+check('same color count sorts by WUBRG order of the identity itself', () => {
   const monoGreen = makeSuggestion({ cards: [makeCommanderCard({ name: 'Green' })], colorIdentity: ['G'] });
   const monoWhite = makeSuggestion({ cards: [makeCommanderCard({ name: 'White' })], colorIdentity: ['W'] });
   const monoBlack = makeSuggestion({ cards: [makeCommanderCard({ name: 'Black' })], colorIdentity: ['B'] });
@@ -47,7 +47,7 @@ check('same colour count sorts by WUBRG order of the identity itself', () => {
   assert.deepStrictEqual(sorted.map(unitName), ['White', 'Black', 'Green']);
 });
 
-check('two-colour identities sort by WUBRG precedence of their first differing colour', () => {
+check('two-color identities sort by WUBRG precedence of their first differing color', () => {
   // Orzhov (WB) before Dimir (UB) before Rakdos (BR): W < U < B in WUBRG.
   const orzhov = makeSuggestion({ cards: [makeCommanderCard({ name: 'Orzhov' })], colorIdentity: ['W', 'B'] });
   const dimir = makeSuggestion({ cards: [makeCommanderCard({ name: 'Dimir' })], colorIdentity: ['U', 'B'] });
@@ -117,6 +117,43 @@ check('colorNameValue mode does not mutate the input array', () => {
   const input = [makeSuggestion({ cards: [makeCommanderCard({ name: 'B' })] }), makeSuggestion({ cards: [makeCommanderCard({ name: 'A' })] })];
   const original = [...input];
   sortSuggestions(input, 'colorNameValue');
+  assert.deepStrictEqual(input, original);
+});
+
+// --- sort direction ---------------------------------------------------------
+
+check('relevance defaults to descending — the server order, untouched', () => {
+  const input = [
+    makeSuggestion({ cards: [makeCommanderCard({ name: 'A' })] }),
+    makeSuggestion({ cards: [makeCommanderCard({ name: 'B' })] }),
+  ];
+  // Same array reference back, since there is nothing to do — and 'desc' is
+  // the default, so omitting it must behave identically.
+  assert.strictEqual(sortSuggestions(input, 'relevance'), input);
+  assert.strictEqual(sortSuggestions(input, 'relevance', 'desc'), input);
+});
+
+check('relevance ascending reverses the server order', () => {
+  const a = makeSuggestion({ cards: [makeCommanderCard({ name: 'A' })] });
+  const b = makeSuggestion({ cards: [makeCommanderCard({ name: 'B' })] });
+  assert.deepStrictEqual(sortSuggestions([a, b], 'relevance', 'asc'), [b, a]);
+});
+
+check('colorNameValue descending reverses its natural order', () => {
+  const first = makeSuggestion({ cards: [makeCommanderCard({ name: 'A' })], colorIdentity: ['W'] });
+  const second = makeSuggestion({ cards: [makeCommanderCard({ name: 'B' })], colorIdentity: ['U'] });
+  assert.deepStrictEqual(sortSuggestions([second, first], 'colorNameValue', 'asc'), [first, second]);
+  assert.deepStrictEqual(sortSuggestions([second, first], 'colorNameValue', 'desc'), [second, first]);
+});
+
+check('reversing does not mutate the input array', () => {
+  const input = [
+    makeSuggestion({ cards: [makeCommanderCard({ name: 'A' })] }),
+    makeSuggestion({ cards: [makeCommanderCard({ name: 'B' })] }),
+  ];
+  const original = [...input];
+  sortSuggestions(input, 'relevance', 'asc');
+  sortSuggestions(input, 'colorNameValue', 'desc');
   assert.deepStrictEqual(input, original);
 });
 

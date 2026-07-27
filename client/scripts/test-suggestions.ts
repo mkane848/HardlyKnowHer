@@ -2,7 +2,7 @@
  * Tests for the "still has supporting cards" filter that keeps the card
  * display (and the filter bar's options) from showing a theme or kindred type the
  * server matched globally but that ended up with zero cards once narrowed
- * to this specific commander's colour identity. Run with: npm test
+ * to this specific commander's color identity. Run with: npm test
  */
 import assert from 'node:assert';
 import {
