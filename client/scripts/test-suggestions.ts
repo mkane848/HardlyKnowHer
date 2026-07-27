@@ -1,6 +1,6 @@
 /**
  * Tests for the "still has supporting cards" filter that keeps the card
- * display (and the filter bar's options) from showing a theme or tribe the
+ * display (and the filter bar's options) from showing a theme or kindred type the
  * server matched globally but that ended up with zero cards once narrowed
  * to this specific commander's colour identity. Run with: npm test
  */
@@ -8,8 +8,8 @@ import assert from 'node:assert';
 import {
   visibleThemeLabels,
   visibleThemeSupport,
-  visibleTribeSupport,
-  visibleTribeTypes,
+  visibleKindredSupport,
+  visibleKindredTypes,
 } from '../src/lib/suggestions';
 import { makeSuggestion, makeSupportingCard } from './fixtures';
 
@@ -33,29 +33,29 @@ check('visibleThemeSupport drops themes with zero supporting cards', () => {
   assert.deepStrictEqual(visibleThemeSupport(suggestion), [withCards]);
 });
 
-check('visibleTribeSupport drops tribes with zero supporting cards', () => {
+check('visibleKindredSupport drops kindred groups with zero supporting cards', () => {
   const suggestion = makeSuggestion({
-    tribeSupport: [
+    kindredSupport: [
       { type: 'Goblin', cards: [] },
       { type: 'Elf', cards: [makeSupportingCard({ name: 'Fake Elf', quantity: 2 })] },
     ],
   });
-  assert.deepStrictEqual(visibleTribeSupport(suggestion).map((t) => t.type), ['Elf']);
+  assert.deepStrictEqual(visibleKindredSupport(suggestion).map((t) => t.type), ['Elf']);
 });
 
-check('visibleThemeLabels/visibleTribeTypes only name the visible groups', () => {
+check('visibleThemeLabels/visibleKindredTypes only name the visible groups', () => {
   const suggestion = makeSuggestion({
     themeSupport: [withCards, empty],
-    tribeSupport: [{ type: 'Goblin', cards: [] }],
+    kindredSupport: [{ type: 'Goblin', cards: [] }],
   });
   assert.deepStrictEqual(visibleThemeLabels(suggestion), ['Sacrifice']);
-  assert.deepStrictEqual(visibleTribeTypes(suggestion), []);
+  assert.deepStrictEqual(visibleKindredTypes(suggestion), []);
 });
 
 check('a suggestion with only empty-card groups shows nothing', () => {
-  const suggestion = makeSuggestion({ themeSupport: [empty], tribeSupport: [{ type: 'Goblin', cards: [] }] });
+  const suggestion = makeSuggestion({ themeSupport: [empty], kindredSupport: [{ type: 'Goblin', cards: [] }] });
   assert.deepStrictEqual(visibleThemeSupport(suggestion), []);
-  assert.deepStrictEqual(visibleTribeSupport(suggestion), []);
+  assert.deepStrictEqual(visibleKindredSupport(suggestion), []);
 });
 
 if (failures > 0) {

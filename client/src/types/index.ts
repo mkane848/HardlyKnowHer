@@ -21,7 +21,7 @@ export interface ThemeSupportDTO {
   cards: SupportingCardDTO[];
 }
 
-export interface TribeSupportDTO {
+export interface KindredSupportDTO {
   type: string;
   cards: SupportingCardDTO[];
 }
@@ -58,7 +58,7 @@ export interface CommanderSuggestionDTO {
   matchedKeywords: string[];
   includedCardCount: number;
   themeSupport: ThemeSupportDTO[];
-  tribeSupport: TribeSupportDTO[];
+  kindredSupport: KindredSupportDTO[];
   keywordSupport: KeywordSupportDTO[];
   gameChangerCards: SupportingCardDTO[];
   gameChangerCount: number;

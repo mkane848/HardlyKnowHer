@@ -9,6 +9,42 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Added
+
+- The About dialog now shows when the app was last updated, alongside the
+  version number. Taken from the build's commit date, not hand-maintained,
+  so it can't go stale the way a manually-typed date would.
+
+### Changed
+
+- A creature type now only counts if the commander's own rules text cares
+  about it. Sharing a type was enough before, so a list with eight Humans
+  in it collected a "Human" tag on every commander that happened to be a
+  Human, whether or not it did anything with them. Krenko counting
+  Goblins, Lathril tapping Elves, and Edgar Markov triggering on Vampire
+  spells all still match; Silas Renn, whose text never mentions Humans,
+  no longer does. A commander need not *be* the type it cares about —
+  Ghoulcaller Gisa is a Human Wizard and one of the best Zombie
+  commanders there is. Irregular plurals are handled, since Lathril's
+  text says "Elves", never "Elf".
+- "Tribal" is now "Kindred" throughout, matching the current wording on
+  cards.
+- Both halves of a Partner/Background pair are named together in one
+  heading. Each face used to render its own full title, so the second
+  name sat below a type line and a whole rules-text box and reading
+  "which two cards is this?" meant scanning the length of the card.
+- The colour filter's hint no longer says "require". Including White does
+  not require white — it permits it, and a commander shows when its whole
+  colour identity fits inside the colours you allowed, which is why
+  allowing White and Black still lists mono-black commanders. Brackets and
+  themes genuinely do require, and keep their original wording.
+- Each group inside "Why this commander?" — every tribe, theme, keyword,
+  and the Game Changers list — is now collapsible and starts collapsed.
+  Expanding the panel used to unroll every supporting card at once, which
+  pushed the page out far enough that the themes themselves were hard to
+  take in. The reasoning now opens as a short list of headings with their
+  counts, and any one group opens on click.
+
 ## [1.2.1] — 2026-07-27
 
 ### Fixed

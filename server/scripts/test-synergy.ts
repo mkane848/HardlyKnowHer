@@ -185,10 +185,14 @@ check('a weak signal is stripped from a suggestion that survives on a strong one
   const humans = Array.from({ length: 16 }, (_, i) =>
     makeCard({ name: `Human ${i}`, color_identity: JSON.stringify(['B']), creature_types: JSON.stringify(['Human']) })
   );
+  // Cares about both types by name, so the *only* thing separating them is
+  // the card count — otherwise this would be testing the cares-about gate
+  // rather than the threshold.
   const candidate = makeCard({
     name: 'Candidate',
     color_identity: JSON.stringify(['B']),
     creature_types: JSON.stringify(['Human', 'Wizard']),
+    oracle_text: 'Whenever another Human or Wizard you control enters, draw a card.',
   });
 
   const ownedEntries = [...wizards, ...humans].map((c) => owned(c));
@@ -198,13 +202,13 @@ check('a weak signal is stripped from a suggestion that survives on a strong one
   assert.strictEqual(suggestions.length, 1);
   // Shown to the user: Human only, no empty-ish Wizard group.
   assert.deepStrictEqual(
-    suggestions[0].tribeSupport.map((t) => t.type),
+    suggestions[0].kindredSupport.map((t) => t.type),
     ['Human']
   );
   // Counted by the engine: likewise Human only.
   assert.deepStrictEqual(suggestions[0].matchedCreatureTypes, ['Human']);
-  // And the score reflects one tribal signal, not two: 16 of the 18 castable
-  // cards back the Human tribe, and nothing is scored for the Wizards.
+  // And the score reflects one kindred signal, not two: 16 of the 18 castable
+  // cards back the Human kindred group, and nothing is scored for the Wizards.
   assert.strictEqual(suggestions[0].score, (16 / 18) * 15);
 });
 
@@ -305,6 +309,103 @@ check('a single matching component theme is not enough for Aristocrats', () => {
   assert.ok(suggestions[0].matchedThemes.includes('Sacrifice'));
 });
 
+// --- kindred requires caring, not just sharing -----------------------------
+
+/** N distinct creatures of one type, so a kindred signal can clear the threshold. */
+function creaturesOfType(n: number, type: string): CardRow[] {
+  return Array.from({ length: n }, (_, i) =>
+    makeCard({
+      name: `${type} ${i}`,
+      color_identity: JSON.stringify(['B']),
+      creature_types: JSON.stringify([type]),
+    })
+  );
+}
+
+check('merely being a creature type is not a kindred signal', () => {
+  // Silas Renn is a Human whose text never mentions Humans. A pile of Humans
+  // in the list says nothing about him, and used to suggest him anyway.
+  const humans = creaturesOfType(8, 'Human');
+  const silas = makeCard({
+    name: 'Silas Renn, Seeker Adept',
+    color_identity: JSON.stringify(['B']),
+    creature_types: JSON.stringify(['Human']),
+    oracle_text: 'Whenever Silas Renn deals combat damage to a player, choose target artifact card in your graveyard.',
+  });
+  const ownedEntries = humans.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(silas)], profile, ownedEntries);
+  assert.deepStrictEqual(
+    suggestions.flatMap((s) => s.matchedCreatureTypes),
+    []
+  );
+});
+
+check('a commander whose text calls out the type does match it', () => {
+  const goblins = creaturesOfType(8, 'Goblin');
+  const krenko = makeCard({
+    name: 'Krenko, Mob Boss',
+    color_identity: JSON.stringify(['B']),
+    creature_types: JSON.stringify(['Goblin']),
+    oracle_text: 'Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.',
+  });
+  const ownedEntries = goblins.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(krenko)], profile, ownedEntries);
+  assert.strictEqual(suggestions.length, 1);
+  assert.deepStrictEqual(suggestions[0].matchedCreatureTypes, ['Goblin']);
+});
+
+check('an irregular plural still counts — "Elves you control" matches Elf', () => {
+  // Lathril never says "Elf", only "Elves". A naive type + "s" would miss one
+  // of the most recognisable kindred commanders in the format.
+  const elves = creaturesOfType(8, 'Elf');
+  const lathril = makeCard({
+    name: 'Lathril, Blade of the Elves',
+    color_identity: JSON.stringify(['B']),
+    creature_types: JSON.stringify(['Elf']),
+    oracle_text: 'Tap ten untapped Elves you control: Create twenty 1/1 black Elf Warrior creature tokens.',
+  });
+  const ownedEntries = elves.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(lathril)], profile, ownedEntries);
+  assert.deepStrictEqual(suggestions[0]?.matchedCreatureTypes, ['Elf']);
+});
+
+check('caring about a type it does not have still counts', () => {
+  // Ghoulcaller Gisa is a Human Wizard and one of the best Zombie commanders
+  // there is. Requiring the commander to *be* the type would miss her.
+  const zombies = creaturesOfType(8, 'Zombie');
+  const gisa = makeCard({
+    name: 'Ghoulcaller Gisa',
+    color_identity: JSON.stringify(['B']),
+    creature_types: JSON.stringify(['Human', 'Wizard']),
+    oracle_text: 'Sacrifice another creature: Create X 2/2 black Zombie creature tokens.',
+  });
+  const ownedEntries = zombies.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(gisa)], profile, ownedEntries);
+  assert.deepStrictEqual(suggestions[0]?.matchedCreatureTypes, ['Zombie']);
+});
+
+check('a pair matches a type only one half cares about (702.124e)', () => {
+  const slivers = creaturesOfType(8, 'Sliver');
+  const silent = makeCard({
+    name: 'Silent Half',
+    color_identity: JSON.stringify(['B']),
+    oracle_text: 'Draw a card.',
+  });
+  const caring = makeCard({
+    name: 'The First Sliver',
+    color_identity: JSON.stringify(['B']),
+    oracle_text: 'Sliver spells you cast have cascade.',
+  });
+  const ownedEntries = slivers.map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([{ cards: [silent, caring] }], profile, ownedEntries);
+  assert.deepStrictEqual(suggestions[0]?.matchedCreatureTypes, ['Sliver']);
+});
+
 // --- scoring measures focus, not colour reach ------------------------------
 
 check('a focused commander outranks a wider one that matches less', () => {
@@ -401,7 +502,9 @@ check('suggestions are sorted by score, highest first', () => {
     name: 'Strong',
     color_identity: JSON.stringify(['B']),
     creature_types: JSON.stringify(['Vampire']),
-    oracle_text: 'Sacrifice a creature: draw a card.',
+    // Names the type, so it earns the kindred signal on top of the theme
+    // both candidates share. Being a Vampire alone would not.
+    oracle_text: 'Sacrifice a creature: draw a card. Other Vampires you control get +1/+1.',
   });
   const ownedEntries = [...sac, ...vampires].map((c) => owned(c));
   const profile = buildCollectionProfile(ownedEntries);
@@ -445,7 +548,11 @@ check("a pair matches a theme that only one half's own text shows", () => {
   assert.ok(suggestions[0].matchedThemes.includes('Sacrifice'));
 });
 
-check('a pair matches a creature type that only one half has', () => {
+check('a pair does not match a creature type it merely has', () => {
+  // The positive case lives in "a pair matches a type only one half cares
+  // about". This is its mirror: one half *is* a Vampire, neither half's text
+  // says so, and the pair is still suggested on its sacrifice theme — so a
+  // missing Vampire tag here is the rule working, not the whole match failing.
   const vampiresOwned = Array.from({ length: 3 }, (_, i) =>
     makeCard({
       name: `Owned Vampire ${i}`,
@@ -453,13 +560,18 @@ check('a pair matches a creature type that only one half has', () => {
       creature_types: JSON.stringify(['Vampire']),
     })
   );
-  const nonVampireHalf = makeCard({ name: 'Non-Vampire Half', color_identity: JSON.stringify(['B']) });
+  const sac = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
+  const nonVampireHalf = makeCard({
+    name: 'Non-Vampire Half',
+    color_identity: JSON.stringify(['B']),
+    oracle_text: 'Sacrifice a creature: draw a card.',
+  });
   const vampireHalf = makeCard({
     name: 'Vampire Half',
     color_identity: JSON.stringify(['B']),
     creature_types: JSON.stringify(['Vampire']),
   });
-  const ownedEntries = vampiresOwned.map((c) => owned(c));
+  const ownedEntries = [...vampiresOwned, ...sac].map((c) => owned(c));
   const profile = buildCollectionProfile(ownedEntries);
   const suggestions = scoreCommanders(
     [{ cards: [nonVampireHalf, vampireHalf] }],
@@ -467,7 +579,8 @@ check('a pair matches a creature type that only one half has', () => {
     ownedEntries
   );
   assert.strictEqual(suggestions.length, 1);
-  assert.ok(suggestions[0].matchedCreatureTypes.includes('Vampire'));
+  assert.ok(suggestions[0].matchedThemes.includes('Sacrifice'));
+  assert.ok(!suggestions[0].matchedCreatureTypes.includes('Vampire'));
 });
 
 if (failures > 0) {

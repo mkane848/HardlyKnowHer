@@ -4,7 +4,7 @@ import { CardDetailDialog } from './CardDetailDialog';
 import { CardImageDialog } from './CardImageDialog';
 import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
-import { visibleKeywordSupport, visibleThemeSupport, visibleTribeSupport } from '../lib/suggestions';
+import { visibleKeywordSupport, visibleThemeSupport, visibleKindredSupport } from '../lib/suggestions';
 import { ManaSymbol } from './ManaSymbol';
 import type { BracketEstimateDTO, CommanderCardDTO, CommanderSuggestionDTO, SupportingCardDTO } from '../types';
 
@@ -58,7 +58,7 @@ function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionD
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const signals: string[] = [];
   if (suggestion.matchedCreatureTypes.length > 0) {
-    signals.push(plural(suggestion.matchedCreatureTypes.length, 'tribal match'));
+    signals.push(plural(suggestion.matchedCreatureTypes.length, 'kindred match'));
   }
   if (suggestion.matchedThemes.length > 0) {
     signals.push(plural(suggestion.matchedThemes.length, 'theme'));
@@ -112,7 +112,19 @@ function CommanderArt({ card }: { card: CommanderCardDTO }) {
  * two, one per card — each is jointly "the commander" (702.124e), so neither
  * gets top billing over the other.
  */
-function CommanderFace({ card, bracket }: { card: CommanderCardDTO; bracket: BracketEstimateDTO }) {
+function CommanderFace({
+  card,
+  bracket,
+  inPair,
+}: {
+  card: CommanderCardDTO;
+  bracket: BracketEstimateDTO;
+  /** Within a pair the two names are already shown together above, so each
+   * face carries a small caption instead of a second full-size heading —
+   * enough to tell which text belongs to which card, without repeating the
+   * title at title weight. */
+  inPair: boolean;
+}) {
   // Whether the clamped rules text is actually cut off, so "Read more" only
   // appears when there is more to read. Measured rather than guessed from
   // character count: how many lines an ability takes depends on the column
@@ -135,7 +147,11 @@ function CommanderFace({ card, bracket }: { card: CommanderCardDTO; bracket: Bra
 
   return (
     <div className="commander-face">
-      <h3 className="commander-name">{card.name}</h3>
+      {inPair ? (
+        <p className="commander-face-label">{card.name}</p>
+      ) : (
+        <h3 className="commander-name">{card.name}</h3>
+      )}
       {card.typeLine && <p className="commander-type">{card.typeLine}</p>}
 
       {/* Rules text in a card's own reading order: name, types, then the
@@ -172,20 +188,20 @@ export function CommanderCard({
   const isGameChanger = suggestion.cards.some((c) => c.isGameChanger);
   const isPair = suggestion.cards.length > 1;
 
-  // Themes/tribes/keywords the collection profile matched globally can still
+  // Themes/kindred/keywords the collection profile matched globally can still
   // end up with zero cards once narrowed to ones that fit this commander's
   // colour identity — that's not a real reason to suggest it, so it's
   // filtered out here rather than shown as an empty group.
-  const tribeSupport = visibleTribeSupport(suggestion);
+  const kindredSupport = visibleKindredSupport(suggestion);
   const themeSupport = visibleThemeSupport(suggestion);
   const keywordSupport = visibleKeywordSupport(suggestion);
-  const tribeTypes = tribeSupport.map((t) => t.type);
+  const kindredTypes = kindredSupport.map((t) => t.type);
   const themeLabels = themeSupport.map((t) => t.label);
   const keywordLabels = keywordSupport.map((k) => k.keyword);
 
   const hasReasons =
     themeSupport.length > 0 ||
-    tribeSupport.length > 0 ||
+    kindredSupport.length > 0 ||
     keywordSupport.length > 0 ||
     suggestion.gameChangerCards.length > 0;
 
@@ -220,8 +236,24 @@ export function CommanderCard({
           <span className="identity-name">{identityName(suggestion.colorIdentity)}</span>
         </div>
 
+        {/* Both halves of a pair are named together, up front. Rendering each
+            face's full heading in sequence pushed the second name below a type
+            line and a whole text box, so reading "who is this pairing?" meant
+            scanning the length of the card. They are jointly the commander
+            (702.124e) and now read as one title. */}
+        {isPair && (
+          <h3 className="commander-name commander-name-pair">
+            {suggestion.cards.map((card, index) => (
+              <span key={card.oracleId}>
+                {index > 0 && <span className="pair-plus"> + </span>}
+                {card.name}
+              </span>
+            ))}
+          </h3>
+        )}
+
         {suggestion.cards.map((card) => (
-          <CommanderFace key={card.oracleId} card={card} bracket={suggestion.bracket} />
+          <CommanderFace key={card.oracleId} card={card} bracket={suggestion.bracket} inPair={isPair} />
         ))}
 
         <div className="badge-row">
@@ -234,9 +266,9 @@ export function CommanderCard({
           Fits {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} from your list
         </p>
 
-        {tribeTypes.length > 0 && (
+        {kindredTypes.length > 0 && (
           <p className="commander-tags">
-            <span className="commander-tags-label">Tribal</span> {tribeTypes.join(', ')}
+            <span className="commander-tags-label">Kindred</span> {kindredTypes.join(', ')}
           </p>
         )}
         {themeLabels.length > 0 && (
@@ -271,19 +303,20 @@ export function CommanderCard({
           <div className="explain-panel" id={detailsId}>
             {/* No "What it does" section here — the rules text is on the card
                 face now, so repeating it would just push the reasoning down. */}
-            {tribeSupport.length > 0 && (
+            {kindredSupport.length > 0 && (
               <section className="explain-section">
-                <h4 className="explain-heading">Tribal overlap</h4>
-                {tribeSupport.map((tribe) => (
-                  <div key={tribe.type} className="explain-group">
-                    <p className="explain-group-title">
-                      {tribe.type} <span className="explain-count">{cardCount(tribe.cards)} in your list</span>
-                    </p>
+                <h4 className="explain-heading">Kindred overlap</h4>
+                {kindredSupport.map((kindred) => (
+                  <details key={kindred.type} className="explain-group">
+                    <summary className="explain-group-title">
+                      {kindred.type} <span className="explain-count">{cardCount(kindred.cards)} in your list</span>
+                    </summary>
                     <p className="explain-group-desc">
-                      Shares a creature type with this commander, so tribal payoffs line up.
+                      This commander's own rules text calls out {kindred.type} — merely sharing a creature
+                      type is not a reason to pick a commander, but caring about one is.
                     </p>
-                    <SupportingCardList cards={tribe.cards} />
-                  </div>
+                    <SupportingCardList cards={kindred.cards} />
+                  </details>
                 ))}
               </section>
             )}
@@ -292,13 +325,13 @@ export function CommanderCard({
               <section className="explain-section">
                 <h4 className="explain-heading">Themes you're already building</h4>
                 {themeSupport.map((theme) => (
-                  <div key={theme.key} className="explain-group">
-                    <p className="explain-group-title">
+                  <details key={theme.key} className="explain-group">
+                    <summary className="explain-group-title">
                       {theme.label} <span className="explain-count">{cardCount(theme.cards)} in your list</span>
-                    </p>
+                    </summary>
                     <p className="explain-group-desc">{theme.description}</p>
                     <SupportingCardList cards={theme.cards} />
-                  </div>
+                  </details>
                 ))}
               </section>
             )}
@@ -307,16 +340,16 @@ export function CommanderCard({
               <section className="explain-section">
                 <h4 className="explain-heading">Shared keywords</h4>
                 {keywordSupport.map((kw) => (
-                  <div key={kw.keyword} className="explain-group">
-                    <p className="explain-group-title">
+                  <details key={kw.keyword} className="explain-group">
+                    <summary className="explain-group-title">
                       {kw.keyword} <span className="explain-count">{cardCount(kw.cards)} in your list</span>
-                    </p>
+                    </summary>
                     <p className="explain-group-desc">
                       This commander has {kw.keyword}, and enough of your list does too for it to be a real pattern,
                       not a coincidence.
                     </p>
                     <SupportingCardList cards={kw.cards} />
-                  </div>
+                  </details>
                 ))}
               </section>
             )}
@@ -324,10 +357,18 @@ export function CommanderCard({
             {suggestion.gameChangerCards.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Driving the Bracket estimate</h4>
-                <p className="explain-group-desc">
-                  These cards are on Wizards' Game Changers list, which is what this estimate counts.
-                </p>
-                <SupportingCardList cards={suggestion.gameChangerCards} />
+                {/* Collapsed like the signal groups above, so no one section
+                    is left stretching the panel on its own. */}
+                <details className="explain-group">
+                  <summary className="explain-group-title">
+                    Game Changers{' '}
+                    <span className="explain-count">{cardCount(suggestion.gameChangerCards)} in your list</span>
+                  </summary>
+                  <p className="explain-group-desc">
+                    These cards are on Wizards' Game Changers list, which is what this estimate counts.
+                  </p>
+                  <SupportingCardList cards={suggestion.gameChangerCards} />
+                </details>
               </section>
             )}
 

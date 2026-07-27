@@ -671,6 +671,30 @@ body {
   line-height: 1.25;
 }
 
+/* Both halves of a pair as one title. Slightly smaller than a solo name
+   because it carries two of them, and it wraps rather than truncating —
+   a commander's name is the one thing that must never be cut off. */
+.commander-name-pair {
+  font-size: 1.05rem;
+}
+
+.pair-plus {
+  color: var(--brass);
+  font-weight: 400;
+}
+
+/* Caption above each half's type line and rules text, telling you which card
+   the text belongs to. Deliberately quiet: the pair title above is the
+   heading, and this only needs to attribute. */
+.commander-face-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brass);
+  margin: 0;
+}
+
 .pip-row {
   display: flex;
   align-items: center;
@@ -952,10 +976,17 @@ body {
   margin: 0;
 }
 
+/* A <details>, so each group's cards start collapsed — expanding "Why this
+   commander?" should show the shape of the reasoning at a glance, not a
+   page-length wall of card names. Block rather than flex: a <details> has no
+   wrapper around its content, so flex would lay out the summary and every
+   sibling as flex items and fight the disclosure behaviour. */
 .explain-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  display: block;
+}
+
+.explain-group > * + * {
+  margin-top: 0.35rem;
 }
 
 .explain-group-title {
@@ -966,6 +997,34 @@ body {
   align-items: baseline;
   gap: 0.5rem;
   flex-wrap: wrap;
+  cursor: pointer;
+  padding: 0.1rem 0;
+  /* Suppress the native marker in both engines — the chevron below replaces
+     it, so it can sit at the end of the row rather than crowding the label. */
+  list-style: none;
+}
+
+.explain-group-title::-webkit-details-marker {
+  display: none;
+}
+
+.explain-group-title::after {
+  content: '▾';
+  display: inline-block;
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--ink-text-muted);
+  transition: transform 120ms ease;
+}
+
+.explain-group[open] > .explain-group-title::after {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explain-group-title::after {
+    transition: none;
+  }
 }
 
 .explain-count {
@@ -1294,6 +1353,10 @@ body {
   font-size: 0.78rem;
   color: var(--ink-text-muted);
   margin: 0.2rem 0 0;
+}
+
+.about-build-date {
+  opacity: 0.75;
 }
 
 .about-blurb {
