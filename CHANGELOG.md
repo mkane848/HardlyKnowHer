@@ -9,7 +9,9 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
-### Changed
+## [1.2.1] — 2026-07-27
+
+### Fixed
 
 - Colour identity no longer scores anything by itself. It used to open the
   formula with `coverageRatio * 50` — the largest single term — which a
