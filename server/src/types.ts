@@ -39,4 +39,10 @@ export interface CardRow {
   is_legendary: number; // 0 | 1
   is_commander_eligible: number; // 0 | 1
   image_uri: string | null;
+  // Second face of a true two-sided card (transform/modal_dfc), for the
+  // art preview's flip control. Null for single-faced cards — and possibly
+  // `undefined` at runtime against a database seeded before these columns
+  // existed, which reads as "no back face" either way.
+  back_image_uri: string | null;
+  back_name: string | null;
 }
