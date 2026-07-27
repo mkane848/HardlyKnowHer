@@ -9,6 +9,49 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Fixed
+
+- Double-faced cards whose *back* is a legendary creature are no longer
+  offered as commanders. Westvale Abbey // Ormendahl, Profane Prince was
+  being suggested because Scryfall's combined type line for it reads
+  "Land // Legendary Creature — Demon", which satisfies a naive
+  Legendary-plus-Creature check off the back face. Eligibility is now judged
+  on the front face alone, which is all a card has outside the battlefield
+  (CR 712.4) — in the command zone that card is a non-legendary land. The
+  same reading fixes flip cards (Bushi Tenderfoot is not legendary; only its
+  flipped side is) and adventures. Split cards deliberately stay joined,
+  since they are one face with both halves' characteristics in every zone.
+  **Takes effect on the next card-data import** — a deploy rebuilds the
+  database from scratch, so it self-heals there; locally, re-run
+  `npm run import-scryfall`.
+
+### Changed
+
+- Suggestions show their **raw score** instead of an "X% match". The
+  percentage was relative to whatever was on screen and read as a confidence
+  it never measured; while the scoring model is being tuned, the actual
+  number is the more useful thing to see. The written explanation behind it
+  is unchanged.
+- The **Bracket estimate is hidden** for now — no badge, note, filter row,
+  or card-detail row — while the calculation is reworked. Game Changers are
+  still flagged, now with a count covering both the commander and the
+  matching cards in your list. The estimate is still computed and still on
+  the API response; only its display is switched off.
+- American spelling ("color") throughout, replacing "colour".
+
+### Added
+
+- **Double-faced cards flip.** The full-art view now offers a Flip control
+  for transform and modal DFCs, showing the back face and its name, the way
+  Scryfall and the deckbuilders do. Reopening a card starts on its front
+  again.
+- **Jump straight to a page.** Pagination shows numbered pages alongside
+  Previous/Next, for both the suggestion grid and each combo list. Long runs
+  collapse behind an ellipsis so a few hundred results don't render a row of
+  numbers wider than the screen.
+- **Sort in either direction.** An arrow beside the sort control reverses
+  whichever mode is selected.
+
 ## [1.4.0] — 2026-07-27
 
 ### Added
@@ -66,9 +109,9 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   heading. Each face used to render its own full title, so the second
   name sat below a type line and a whole rules-text box and reading
   "which two cards is this?" meant scanning the length of the card.
-- The colour filter's hint no longer says "require". Including White does
+- The color filter's hint no longer says "require". Including White does
   not require white — it permits it, and a commander shows when its whole
-  colour identity fits inside the colours you allowed, which is why
+  color identity fits inside the colors you allowed, which is why
   allowing White and Black still lists mono-black commanders. Brackets and
   themes genuinely do require, and keep their original wording.
 - Each group inside "Why this commander?" — every kindred type, theme, keyword,
@@ -82,17 +125,17 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ### Fixed
 
-- Colour identity no longer scores anything by itself. It used to open the
+- Color identity no longer scores anything by itself. It used to open the
   formula with `coverageRatio * 50` — the largest single term — which a
-  five-colour commander banked in full for free, so it could out-rank a
-  mono-colour commander that matched your list twice as well before any
+  five-color commander banked in full for free, so it could out-rank a
+  mono-color commander that matched your list twice as well before any
   synergy was weighed. Identity now only decides which cards are eligible
   to count.
 - Signals are scored by density instead of a flat count: each tribe, theme,
   keyword, and archetype is worth the share of that commander's playable
   cards standing behind it. A signal every playable card supports is worth
   its full weight; one that half of them support is worth half. Scoring
-  now rewards a focused fit rather than colour reach, and a deep theme no
+  now rewards a focused fit rather than color reach, and a deep theme no
   longer counts the same as one scraping the three-card minimum.
 
 ## [1.2.0] — 2026-07-26
@@ -109,7 +152,7 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   trimmed is reported as "N extra copies ignored" beside the matched
   count.
 - A theme, tribe, or keyword now needs at least **three** supporting cards
-  to count, measured after narrowing to that commander's own colour
+  to count, measured after narrowing to that commander's own color
   identity. Below that it is dropped from the recommendation engine
   entirely, not just hidden — it no longer contributes to a commander's
   score, and no longer appears in "Why this commander?". A group of one or
@@ -117,9 +160,9 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   thin to check.
 - Result filters are now include/exclude rather than include-only: tap a
   chip once to require it, again to exclude it, again to clear it. This
-  applies to colours, Colorless/Multicolor, Brackets, and themes alike.
+  applies to colors, Colorless/Multicolor, Brackets, and themes alike.
 - Colorless and Multicolor moved out of their own row and into the Colors
-  row alongside the WUBRG pips, since they describe a colour identity too.
+  row alongside the WUBRG pips, since they describe a color identity too.
 
 ### Added
 
@@ -145,12 +188,12 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 - Whole-card art preview: tapping a commander's image, or any supporting
   card cited in a "Why this commander?" explanation, opens that card at
   its own proportions.
-- A sort control (best match, or colour/name/mana value) alongside the
+- A sort control (best match, or color/name/mana value) alongside the
   existing filters.
 - "Copy list" and "Download .txt" export the current suggestion list.
 - Suggestion tags and filter options (Tribal/Themes/Keywords, and the
   filter bar's theme chips) now only count a theme or tribe if it still
-  has supporting cards after narrowing to that commander's colour
+  has supporting cards after narrowing to that commander's color
   identity, rather than showing one with nothing behind it.
 - Layout now keeps clear of notches, the home indicator, and a sliding
   mobile URL bar on phones.

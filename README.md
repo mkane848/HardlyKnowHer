@@ -3,7 +3,7 @@
 Paste or upload a Magic: The Gathering card list and get Commander
 suggestions based on synergies found in that list, filtered to cards
 currently legal in Commander, each with a "why this commander?" explanation
-and an estimated power Bracket.
+and the raw score it was ranked by.
 
 - **Client:** Vite + React + TypeScript + Zustand + TanStack Query/Table
 - **Server:** Express + TypeScript + better-sqlite3
@@ -21,7 +21,17 @@ and an estimated power Bracket.
    oracle text).
 4. It scores every Commander-eligible, currently-legal card — and every
    legal Partner/Background pairing (see below) — against that profile and
-   returns the best matches, each tagged with an estimated Bracket.
+   returns the best matches, each showing the score it was ranked by.
+
+**On commander eligibility and double-faced cards:** eligibility is judged on
+a card's **front face only**, because that is all a card has outside the
+battlefield (CR 712.4). Westvale Abbey // Ormendahl, Profane Prince is a
+non-legendary *land* in the command zone — Ormendahl only exists once it has
+transformed — so it is not a legal commander, even though the two faces read
+together contain both "Legendary" and "Creature". The same reading applies to
+flip cards (Bushi Tenderfoot is not legendary; only its flipped side is) and
+adventures. Split cards are the exception and stay joined: they are one face
+with both halves' characteristics in every zone (CR 709.4).
 
 **On kindred (what used to be called "tribal"):** a creature type only counts
 if the commander's own rules text *cares* about it — merely being that type is
@@ -41,17 +51,19 @@ even though "sacrifice" appears in it.
 **On what scoring rewards:** a commander is scored on how *focused* a fit it
 is, not how much of your list it can legally cast. Each signal counts for the
 share of that commander's playable cards standing behind it, so a mono-black
-commander whose every playable card feeds one theme beats a five-colour one
-that can cast everything and half-supports the same theme. Colour identity
+commander whose every playable card feeds one theme beats a five-color one
+that can cast everything and half-supports the same theme. Color identity
 only decides which cards are eligible to count — breadth is what lets a
 commander play your cards, never a reason to prefer one.
 
-**On the Bracket estimate:** it's based on how many official
-[Game Changer](https://mtgcommander.net) cards are involved — that's the one
-hard, checkable signal in the Bracket system. Real bracket placement also
-weighs combo speed, mass land destruction, and extra-turn density, which
-can't be reliably detected from card text alone. Treat the estimate as a
-starting point for a Rule 0 conversation, not a verdict.
+**On the Bracket estimate:** currently **hidden in the UI** while the
+calculation is reworked — suggestions no longer show a Bracket badge, note,
+or filter. Cards involving an official
+[Game Changer](https://mtgcommander.net) are still flagged, since that is the
+one hard, checkable signal. The estimate itself is still computed and still
+in the API response; only its display is switched off (see
+`SHOW_BRACKET_FILTER` in `ResultFilters.tsx` and the badge row in
+`CommanderCard.tsx`).
 
 ## Setup
 
@@ -115,14 +127,14 @@ no test framework) and run in a few seconds. See each `scripts/test-*.ts`
 file for what's covered — deck-list parsing, Commander Spellbook response
 normalisation, Bracket estimation, Partner/Background pairing, and the
 scoring engine (including the union-across-a-pair semantics) on the server;
-colour ordering, the "still has supporting cards" display filter, filter-bar
+color ordering, the "still has supporting cards" display filter, filter-bar
 matching, and sort ordering on the client.
 
 ## Card list format
 
 Plain text, one card per line. Quantities and any trailing export metadata —
 set codes, collector numbers, foil/commander markers, Archidekt categories and
-colour labels — are optional and get stripped automatically, so you can paste
+color labels — are optional and get stripped automatically, so you can paste
 an export straight from the usual deck sites without cleaning it up first:
 
 ```
@@ -173,7 +185,7 @@ A commander with **Partner**, **Partner — [text]**, **Partner with [Name]**,
 and as one suggestion per card it can legally share the command zone with,
 unified on the same ranked list — not a separate section, and not
 pre-computed ahead of time; every request scores the whole legal set of
-solo commanders and pairs fresh. A pair's colour identity, creature types,
+solo commanders and pairs fresh. A pair's color identity, creature types,
 keywords, and themes are the union of both halves (rule 702.124e): a signal
 either card would show on its own is enough to suggest the pair.
 
@@ -182,18 +194,19 @@ either card would show on its own is enough to suggest the pair.
 Each suggestion has a **"Why this commander?"** disclosure. Expanding it shows
 every creature type, keyword, and theme it shares with your list, the
 specific cards behind each of those signals, and which cards drive the
-Bracket estimate. Only cards that fit the commander's colour identity are
+Bracket estimate. Only cards that fit the commander's color identity are
 cited, and a theme/kindred type/keyword only counts — both as a reason shown here
 and toward whether the commander is suggested at all — if it still has at
 least three citable cards once narrowed that way. A global match that
-thins out to one or two cards once narrowed to this commander's own colours
+thins out to one or two cards once narrowed to this commander's own colors
 isn't a real pattern, so it's dropped entirely rather than shown as a weak
 reason.
 
 Each cited card's name shows its art on hover (or on tap, on a touch screen)
 without leaving the list, and its mana value alongside the name. Tapping a
 commander's own art, or any cited card's name, opens that card at its own
-proportions. The rules-text box on the card face opens a fuller detail view
+proportions — with a **Flip** control for double-faced cards, so you can see
+the back without leaving for Scryfall. The rules-text box on the card face opens a fuller detail view
 (mana cost, power/toughness, a link to the card on Scryfall).
 
 Inside the "why" panel, **"Find combos"** asks
@@ -221,24 +234,27 @@ and `handoff.md` for the plan.
 
 - **Filter** by color, Colorless/Multicolor, Bracket, and theme, all in the
   same tri-state include/exclude model: tap a chip once to require it,
-  again to exclude it, again to clear it. Colour chips are subset matching
+  again to exclude it, again to clear it. Color chips are subset matching
   when included (picking Black and Green shows what you could actually
-  build in Golgari, not just anything that touches either colour) and
+  build in Golgari, not just anything that touches either color) and
   touch matching when excluded (excluding Black drops anything with black
   in its identity). Colorless and Multicolor live in the same row as the
-  WUBRG pips, since they're really just another way of describing a colour
+  WUBRG pips, since they're really just another way of describing a color
   identity.
-- **Sort** by best match (the server's score, the default) or by colour
-  count → WUBRG order → name → mana value.
-- Each suggestion's badge row shows a **match score**, relative to the best
-  match currently on screen (the top suggestion always reads 100%). Hover
-  or tap it for a breakdown of what drove the score — the kindred, theme and
-  keyword signals it matched, and the pool they were weighed against.
+- **Sort** by best match (the server's score, the default) or by color
+  count → WUBRG order → name → mana value, in either direction — the arrow
+  beside the sort control reverses whichever mode is selected.
+- Each suggestion's badge row shows its **raw score** — the actual number it
+  was ranked by, deliberately not normalised into a percentage or a
+  confidence label while the scoring model is still being tuned. Hover or tap
+  it for the reasoning: the kindred, theme and keyword signals it matched,
+  and the pool they were weighed against.
 - **Export** the current list via "Copy list" or "Download .txt".
-- **Dismiss** individual suggestions (restorable) and page through the rest.
-  There's no cap on how many suggestions can come back — every commander
-  that clears the matching bar is included — so how many show per page is
-  yours to set via the "Show" control, and it's remembered for next time.
+- **Dismiss** individual suggestions (restorable) and page through the rest,
+  jumping straight to a page by number rather than only stepping. There's no
+  cap on how many suggestions can come back — every commander that clears the
+  matching bar is included — so how many show per page is yours to set via the
+  "Show" control, and it's remembered for next time.
 
 ## Data sources
 

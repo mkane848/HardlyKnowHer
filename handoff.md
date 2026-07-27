@@ -74,9 +74,9 @@ empty (just `.gitkeep`) in the committed tree.
 All explicitly requested by the user unless noted:
 
 - **Vite + React + TypeScript** (client)
-- **MTG presentation conventions** live in `client/src/lib/mtg.ts`: colours are
+- **MTG presentation conventions** live in `client/src/lib/mtg.ts`: colors are
   always shown in WUBRG order (never alphabetical, never raw data order), and
-  a colour identity is named — "Golgari", not "Black/Green" — because that's
+  a color identity is named — "Golgari", not "Black/Green" — because that's
   what players read. Symbols are the real mana glyphs, inlined as SVG paths in
   `lib/manaSymbols.ts` and drawn by `components/ManaSymbol.tsx`.
   These came from the `mana-font` package (MIT), but **the package itself is
@@ -165,7 +165,7 @@ client/                Vite + React + TS + Zustand + TanStack Query/Table
       client.ts             fetchRecommendations/fetchCombos, wakeServer, cold-start retry
       queries.ts             TanStack Query hooks wrapping the above
     lib/
-      mtg.ts                 WUBRG ordering, colour-identity naming (Dimir, Golgari, ...)
+      mtg.ts                 WUBRG ordering, color-identity naming (Dimir, Golgari, ...)
       filters.ts              SuggestionFilters + matching logic (color/category/bracket/theme)
       sort.ts                 SortMode ('relevance' | 'colorNameValue'); compares a unit's
                                joined display name and summed mana value across its 1-2 cards
@@ -207,7 +207,7 @@ client/                Vite + React + TS + Zustand + TanStack Query/Table
       AboutDialog.tsx             version, credits, repo link
   scripts/                 npm test — dependency-free node:assert + tsx, no framework
     fixtures.ts               makeSuggestion/makeCommanderCard/makeSupportingCard test builders
-    test-mtg.ts                WUBRG ordering + colour-identity naming cases
+    test-mtg.ts                WUBRG ordering + color-identity naming cases
     test-suggestions.ts         "still has supporting cards" filter cases
     test-filters.ts             SuggestionFilters matching + availableFilterValues cases
     test-sort.ts                sort mode ordering cases, incl. Partner-pair name/mana-value ties
@@ -237,17 +237,22 @@ server/                Express + TS + better-sqlite3
                                 from the candidate pool — see "Partner/Background" below
       synergy.ts               profile-building + commander scoring (the core logic), operating on
                                 `CommanderUnit`s (1-2 cards), not single cards
-      bracket.ts               Game-Changer-count -> Bracket estimate
+      bracket.ts               Game-Changer-count -> Bracket estimate (still computed and
+                                still on the API response, but its UI is hidden — see below)
+      eligibility.ts           front-face-only commander eligibility (CR 712.4); the reason
+                                Westvale Abbey is not a legal commander
       spellbook.ts             Commander Spellbook adapter: cache, backoff, response normalisation
   scripts/
     fetch-scryfall.ts        downloads current Oracle Cards bulk file (skips if a recent copy exists)
     import-scryfall.ts       parses that file into server/data/cards.sqlite + card_face_names;
                              also detects Partner-family abilities and Background enchantments
-                             (rule 702.124) from oracle text
+                             (rule 702.124) from oracle text, and stores each DFC's back-face
+                             image/name for the art preview's flip control
     test-parse-list.ts        npm test — parser cases (node:assert via tsx)
     test-spellbook.ts          npm test — Spellbook adapter cases, against a local mock
     test-bracket.ts             npm test — Bracket-estimate cases
     test-partners.ts             npm test — every pairing variant + negative cases (rule 702.124)
+    test-eligibility.ts           npm test — front-face rule for DFC/flip/adventure/split layouts
     test-singleton.ts             npm test — copy limits, exemptions, and repeated-line merging
     test-synergy.ts               npm test — profiling + scoring, incl. union-across-a-pair semantics
   data/                     gitignored; oracle-cards.json + cards.sqlite live here
@@ -259,7 +264,7 @@ server/                Express + TS + better-sqlite3
   `1x`/`1 x` quantities, and strips whatever export metadata trails the name:
   `(SET) 263` and `[SET] 84` set codes (Moxfield/Arena/MTGO use parentheses,
   TCGplayer Mass Entry uses square brackets), `*F*`/`*CMDR*` markers,
-  Archidekt `[Category]` tags and `^Label,#hex^` colour labels, and
+  Archidekt `[Category]` tags and `^Label,#hex^` color labels, and
   spelled-out set names like `(Commander 2021)`. Because sites combine these
   in different orders, the stripping runs in a loop rather than as one
   anchored regex — that ordering assumption is what made the original version
@@ -333,7 +338,7 @@ server/                Express + TS + better-sqlite3
      — see above): requires nonzero color-identity overlap AND at least one
      kindred/theme/keyword/archetype signal to even be considered. A signal
      counts only if at least `MIN_SIGNAL_COUNT` (3) *distinct* cards back it
-     **after** narrowing to that unit's colour identity. Every signal is
+     **after** narrowing to that unit's color identity. Every signal is
      unioned across both cards in a pair (`unitColorIdentity`/
      `unitKeywords`/`unitOracleText`) per rule 702.124e — a Partner pair
      matches anything either half of it would match solo, and its combined
@@ -358,10 +363,10 @@ server/                Express + TS + better-sqlite3
      archetype * 20`. So a signal every playable card supports is worth its
      full weight; one that half of them support is worth half.
 
-     Colour identity decides *which cards are eligible* and contributes
+     Color identity decides *which cards are eligible* and contributes
      nothing to the score. It used to: an earlier formula opened with
-     `coverageRatio * 50`, the largest term, which a five-colour commander
-     banked in full for free — it could out-rank a mono-colour commander
+     `coverageRatio * 50`, the largest term, which a five-color commander
+     banked in full for free — it could out-rank a mono-color commander
      that matched the list twice as well, before synergy was even weighed.
      Reach is what lets a commander play your cards; it is not a reason to
      prefer one. See the two "scoring measures focus" cases in
@@ -389,6 +394,27 @@ server/                Express + TS + better-sqlite3
   speed, mass land destruction, or extra-turn density — the real Bracket
   system does, but that's not reliably detectable from card text. This
   caveat is surfaced in the UI copy; keep it there if this logic changes.
+
+- **`eligibility.ts`** — commander eligibility, judged on a card's **front
+  face only**. A double-faced card has only its front face's characteristics
+  outside the battlefield (CR 712.4), and Scryfall's top-level `type_line`
+  for one is the two faces joined ("Land // Legendary Creature — Demon").
+  Reading that whole made Westvale Abbey look legal off the back face's
+  "Legendary" and "Creature" — it is a plain non-legendary land in the
+  command zone. Same reading fixes `flip` (Bushi Tenderfoot is not
+  legendary, only its flipped side is) and `adventure`. `split` is the
+  documented exception and stays joined: one face, both halves'
+  characteristics in every zone (CR 709.4).
+
+  Lives apart from `import-scryfall.ts`, its only caller, purely so it can
+  be tested against real card shapes without running an import. **This is
+  import-time**, so an existing `cards.sqlite` keeps the old flag until
+  re-imported — deploys rebuild from scratch every time, so it self-heals
+  there; locally, re-run `npm run import-scryfall`.
+
+  Note this also narrows `creature_types` to the front face: a card in your
+  library is its front face, so Delver of Secrets counts toward Wizards
+  rather than the Insect its battlefield-only back side becomes.
 
 - **`db.ts`** — `isSeeded` check so the API returns a helpful 503 instead
   of a raw SQL error if `npm run prepare-data` hasn't been run yet. Also
@@ -560,7 +586,7 @@ which was carried forward on top of the kept design:
   (`visibleThemeSupport`/`visibleKindredSupport`, extended here with a
   `visibleKeywordSupport` for the keyword category main didn't have): a
   theme/kindred type/keyword matched against the collection *globally* can end up
-  with zero cards once narrowed to a specific commander's colour identity;
+  with zero cards once narrowed to a specific commander's color identity;
   this filters those out of both the card display and the filter bar's
   available options instead of showing/offering an empty reason. This was
   a real latent bug in this branch's original synergy.ts too, not something
@@ -587,7 +613,7 @@ click-to-cycle chips in `ResultFilters.tsx`). That's a real, independent
 filter-UX upgrade, but it wasn't part of what was asked to be carried
 forward (sort/export/art-preview/mobile-layout/tests were) and swapping the
 whole filtering paradigm felt like a bigger call to make unilaterally mid-
-merge. This branch kept its original simple filter model (colours + a
+merge. This branch kept its original simple filter model (colors + a
 colorless/multicolor category toggle + brackets + themes, all "must
 include", via Radix `ToggleGroup`) and only added the sort control to it.
 If the include/exclude model is wanted later, it's sitting in main's git
