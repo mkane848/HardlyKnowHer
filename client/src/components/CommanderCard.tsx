@@ -53,15 +53,18 @@ function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionD
   const tooltipId = useId();
   const percent = maxScore > 0 ? Math.round((suggestion.score / maxScore) * 100) : 100;
 
+  // Each entry names its own kind and carries its own plural, so they read
+  // correctly joined together without a trailing noun to agree with.
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const signals: string[] = [];
   if (suggestion.matchedCreatureTypes.length > 0) {
-    signals.push(`${suggestion.matchedCreatureTypes.length} tribal`);
+    signals.push(plural(suggestion.matchedCreatureTypes.length, 'tribal match'));
   }
   if (suggestion.matchedThemes.length > 0) {
-    signals.push(`${suggestion.matchedThemes.length} theme${suggestion.matchedThemes.length === 1 ? '' : 's'}`);
+    signals.push(plural(suggestion.matchedThemes.length, 'theme'));
   }
   if (suggestion.matchedKeywords.length > 0) {
-    signals.push(`${suggestion.matchedKeywords.length} keyword${suggestion.matchedKeywords.length === 1 ? '' : 's'}`);
+    signals.push(plural(suggestion.matchedKeywords.length, 'keyword'));
   }
 
   return (
@@ -83,9 +86,9 @@ function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionD
         {percent < 100
           ? `${percent}% as strong a match as the top suggestion here`
           : 'The strongest match in your current results'}
-        {signals.length > 0 ? `: ${signals.join(', ')} signal${signals.length === 1 ? '' : 's'}` : ''}, weighed against
-        the {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} it can play from your
-        list. Colours decide which cards count, never how good the match is.
+        {signals.length > 0 ? `: ${signals.join(', ')}` : ''}, weighed against the {suggestion.includedCardCount} card
+        {suggestion.includedCardCount === 1 ? '' : 's'} it can play from your list. Colours decide which cards count,
+        never how good the match is.
       </span>
     </span>
   );
