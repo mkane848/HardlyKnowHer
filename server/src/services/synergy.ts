@@ -364,6 +364,11 @@ const MIN_SIGNAL_COUNT = 3;
  * signal it matched. Only cards that actually fit the commander's colour
  * identity are cited, since a card you couldn't legally run under that
  * commander is not a reason to pick it.
+ *
+ * Scoring measures *focus*, not reach: every signal counts for the share of
+ * the commander's castable pool that backs it. Colour identity decides
+ * which cards are eligible and nothing more — breadth of identity is what
+ * lets a commander play your cards, never a reason to prefer one.
  */
 export function scoreCommanders(
   units: CommanderUnit[],
@@ -377,9 +382,17 @@ export function scoreCommanders(
     const fitsIdentity = ({ row }: OwnedCard) =>
       parseJsonArray(row.color_identity).every((c) => identitySet.has(c));
 
+    // Two counts on purpose. includedCardCount sums quantity and is what the
+    // user is shown ("Fits N cards from your list"). The density denominator
+    // below counts *distinct* cards instead, so it shares units with the
+    // support lists, which hold one entry per card regardless of copies.
     let includedCardCount = 0;
+    let includedDistinctCount = 0;
     for (const entry of owned) {
-      if (fitsIdentity(entry)) includedCardCount += entry.quantity;
+      if (fitsIdentity(entry)) {
+        includedCardCount += entry.quantity;
+        includedDistinctCount += 1;
+      }
     }
     if (includedCardCount === 0) continue;
 
@@ -423,16 +436,23 @@ export function scoreCommanders(
       continue;
     }
 
+    // Pulled out of themeSupport so the archetype's own card list can be
+    // scored below, rather than recomputed there.
+    const archetypeEntries = matchedArchetypes.map((arch) => ({
+      arch,
+      cards: dedupeCards(
+        arch.componentKeys
+          .filter((k) => matchedThemeKeys.has(k))
+          .flatMap((k) => themeCardsByKey.get(k) ?? [])
+      ),
+    }));
+
     const themeSupport: ThemeSupport[] = [
-      ...matchedArchetypes.map((arch) => ({
+      ...archetypeEntries.map(({ arch, cards }) => ({
         key: arch.key,
         label: arch.label,
         description: arch.description,
-        cards: dedupeCards(
-          arch.componentKeys
-            .filter((k) => matchedThemeKeys.has(k))
-            .flatMap((k) => themeCardsByKey.get(k) ?? [])
-        ),
+        cards,
       })),
       ...matchedThemeEntries.map(({ def, cards }) => ({
         key: def.key,
@@ -446,13 +466,22 @@ export function scoreCommanders(
       .filter((entry) => entry.row.game_changer && fitsIdentity(entry))
       .map(toSupportingCard);
 
-    const coverageRatio = includedCardCount / Math.max(profile.totalCards, 1);
+    // Each signal is worth how much of the *castable* pool stands behind it,
+    // not how many cards these colours happen to permit. A commander whose
+    // every playable card feeds one theme fits better than one that can play
+    // everything and half-supports the same theme.
+    //
+    // Colour identity therefore only decides which cards count (above) and
+    // scores nothing by itself. It used to contribute the single largest
+    // term — a five-colour commander banked all of it for free, taking a
+    // fixed lead over any focused commander before synergy was looked at.
+    const pool = Math.max(includedDistinctCount, 1);
+    const density = (supporting: number) => supporting / pool;
     const score =
-      coverageRatio * 50 +
-      matchedCreatureTypes.length * 15 +
-      matchedThemeDefs.length * 10 +
-      matchedKeywords.length * 8 +
-      matchedArchetypes.length * 20;
+      tribeSupport.reduce((sum, t) => sum + density(t.cards.length), 0) * 15 +
+      matchedThemeEntries.reduce((sum, t) => sum + density(t.cards.length), 0) * 10 +
+      keywordSupport.reduce((sum, k) => sum + density(k.cards.length), 0) * 8 +
+      archetypeEntries.reduce((sum, a) => sum + density(a.cards.length), 0) * 20;
 
     suggestions.push({
       cards: unit.cards,

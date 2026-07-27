@@ -23,6 +23,14 @@ and an estimated power Bracket.
    legal Partner/Background pairing (see below) — against that profile and
    returns the best matches, each tagged with an estimated Bracket.
 
+**On what scoring rewards:** a commander is scored on how *focused* a fit it
+is, not how much of your list it can legally cast. Each signal counts for the
+share of that commander's playable cards standing behind it, so a mono-black
+commander whose every playable card feeds one theme beats a five-colour one
+that can cast everything and half-supports the same theme. Colour identity
+only decides which cards are eligible to count — breadth is what lets a
+commander play your cards, never a reason to prefer one.
+
 **On the Bracket estimate:** it's based on how many official
 [Game Changer](https://mtgcommander.net) cards are involved — that's the one
 hard, checkable signal in the Bracket system. Real bracket placement also
@@ -202,8 +210,8 @@ and `handoff.md` for the plan.
   count → WUBRG order → name → mana value.
 - Each suggestion's badge row shows a **match score**, relative to the best
   match currently on screen (the top suggestion always reads 100%). Hover
-  or tap it for a breakdown of what drove the score — cards fitting its
-  colours, plus any tribal/theme/keyword signal.
+  or tap it for a breakdown of what drove the score — the tribal, theme and
+  keyword signals it matched, and the pool they were weighed against.
 - **Export** the current list via "Copy list" or "Download .txt".
 - **Dismiss** individual suggestions (restorable) and page through the rest.
 

@@ -203,9 +203,9 @@ check('a weak signal is stripped from a suggestion that survives on a strong one
   );
   // Counted by the engine: likewise Human only.
   assert.deepStrictEqual(suggestions[0].matchedCreatureTypes, ['Human']);
-  // And the score reflects one tribal signal, not two.
-  const coverage = (18 / 18) * 50;
-  assert.strictEqual(suggestions[0].score, coverage + 15);
+  // And the score reflects one tribal signal, not two: 16 of the 18 castable
+  // cards back the Human tribe, and nothing is scored for the Wizards.
+  assert.strictEqual(suggestions[0].score, (16 / 18) * 15);
 });
 
 check("a matched theme still requires the candidate's own text to show the same signal", () => {
@@ -303,6 +303,82 @@ check('a single matching component theme is not enough for Aristocrats', () => {
   assert.strictEqual(suggestions.length, 1);
   assert.strictEqual(suggestions[0].matchedThemes.includes('Aristocrats'), false);
   assert.ok(suggestions[0].matchedThemes.includes('Sacrifice'));
+});
+
+// --- scoring measures focus, not colour reach ------------------------------
+
+check('a focused commander outranks a wider one that matches less', () => {
+  // The bug this replaced: colour identity used to be worth more than every
+  // synergy term combined, so a five-colour commander that could cast the
+  // whole list beat a mono-black one that actually matched it twice over.
+  const black = Array.from({ length: 6 }, (_, i) =>
+    makeCard({
+      name: `Black ${i}`,
+      color_identity: JSON.stringify(['B']),
+      oracle_text: 'Return a card from your graveyard to your hand. Draw a card.',
+    })
+  );
+  const azorius = Array.from({ length: 6 }, (_, i) =>
+    makeCard({
+      name: `WU ${i}`,
+      color_identity: JSON.stringify(['W', 'U']),
+      oracle_text: 'Exile a card from your graveyard.',
+    })
+  );
+  const mono = makeCard({
+    name: 'Mono-Black Synergist',
+    color_identity: JSON.stringify(['B']),
+    oracle_text: 'Return a card from your graveyard to your hand. Draw a card.',
+  });
+  const wubrg = makeCard({
+    name: 'Five-Colour Generalist',
+    color_identity: JSON.stringify(['W', 'U', 'B', 'R', 'G']),
+    oracle_text: 'Exile a card from your graveyard.',
+  });
+
+  const ownedEntries = [...black, ...azorius].map((c) => owned(c));
+  const profile = buildCollectionProfile(ownedEntries);
+  const suggestions = scoreCommanders([solo(wubrg), solo(mono)], profile, ownedEntries);
+
+  // Mono-black matches two themes at full density across its 6 castable
+  // cards; the five-colour one matches a single theme and earns nothing for
+  // being able to cast twice as much.
+  assert.strictEqual(suggestions[0].cards[0].name, 'Mono-Black Synergist');
+  assert.strictEqual(suggestions[0].score, 20);
+  assert.strictEqual(suggestions[1].score, 10);
+});
+
+check('breadth alone never scores — identity only decides what is eligible', () => {
+  // Same signal, same density, different colour reach: the scores must match.
+  const cards = (identity: string[], n: number, prefix: string) =>
+    Array.from({ length: n }, (_, i) =>
+      makeCard({
+        name: `${prefix} ${i}`,
+        color_identity: JSON.stringify(identity),
+        oracle_text: 'Sacrifice a creature: draw a card.',
+      })
+    );
+  const narrowList = cards(['B'], 4, 'Mono');
+  const wideList = [...cards(['B'], 4, 'W1'), ...cards(['W', 'U'], 4, 'W2')];
+
+  const narrowCandidate = makeCard({
+    name: 'Narrow',
+    color_identity: JSON.stringify(['B']),
+    oracle_text: 'Sacrifice a creature: draw a card.',
+  });
+  const wideCandidate = makeCard({
+    name: 'Wide',
+    color_identity: JSON.stringify(['W', 'U', 'B', 'R', 'G']),
+    oracle_text: 'Sacrifice a creature: draw a card.',
+  });
+
+  const narrowOwned = narrowList.map((c) => owned(c));
+  const wideOwned = wideList.map((c) => owned(c));
+  const narrow = scoreCommanders([solo(narrowCandidate)], buildCollectionProfile(narrowOwned), narrowOwned);
+  const wide = scoreCommanders([solo(wideCandidate)], buildCollectionProfile(wideOwned), wideOwned);
+
+  // 4 of 4 castable cards versus 8 of 8 — both fully focused, so equal.
+  assert.strictEqual(narrow[0].score, wide[0].score);
 });
 
 // --- sorting -------------------------------------------------------------
