@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import * as HoverCard from '@radix-ui/react-hover-card';
 import { ComboFinder } from './ComboFinder';
 import { CardDetailDialog } from './CardDetailDialog';
 import { CardImageDialog } from './CardImageDialog';
@@ -12,20 +13,60 @@ function cardCount(cards: SupportingCardDTO[]): number {
   return cards.reduce((sum, card) => sum + card.quantity, 0);
 }
 
+/**
+ * A supporting card's name, with its art appearing on hover.
+ *
+ * HoverCard rather than a hand-rolled CSS tooltip because it portals its
+ * content to `document.body` — `.support-cards` sets `overflow: hidden` for
+ * its own rounded-corner row backgrounds, which would clip a plain
+ * absolutely-positioned preview nested inside it. HoverCard also handles
+ * viewport collision (flips below when there's no room above) for free.
+ *
+ * Deliberately hover-only, not tap: a touch device has no hover to fire this
+ * from, but tapping already opens the full CardImageDialog below, which
+ * shows the same art at a size actually usable on a small screen — a
+ * floating thumbnail next to your own finger would be worse there, not
+ * better, so there is nothing to add for touch.
+ */
+function SupportingCardName({ card }: { card: SupportingCardDTO }) {
+  const nameButton = (
+    <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
+      <button type="button" className="support-name" aria-label={`Show the card ${card.name}`}>
+        {card.name}
+      </button>
+    </CardImageDialog>
+  );
+
+  if (!card.imageUri) return nameButton;
+
+  return (
+    <HoverCard.Root openDelay={150} closeDelay={0}>
+      {/* A <span>, not the dialog trigger itself — that renders a custom
+          component rather than a DOM node, which asChild has nothing to
+          forward hover listeners onto. */}
+      <HoverCard.Trigger asChild>
+        <span className="support-name-wrap">{nameButton}</span>
+      </HoverCard.Trigger>
+      <HoverCard.Portal>
+        <HoverCard.Content className="card-hover-preview" side="top" align="start" sideOffset={8}>
+          <img src={card.imageUri} alt="" loading="lazy" />
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
+  );
+}
+
 function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
   return (
     <ul className="support-cards">
       {cards.map((card) => (
         <li key={card.name} className="support-card">
           {card.quantity > 1 && <span className="support-qty">{card.quantity}×</span>}
-          {/* The name opens the card itself — the list is where you're
-              checking "which cards did it actually mean?", and a name alone
-              often isn't enough to remember what one does. */}
-          <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
-            <button type="button" className="support-name" aria-label={`Show the card ${card.name}`}>
-              {card.name}
-            </button>
-          </CardImageDialog>
+          <SupportingCardName card={card} />
+          {/* Truncates alongside the name under CSS rather than being hidden
+              by a width measurement — simpler, and it degrades the same way
+              a long name itself does when the row is tight. */}
+          {card.manaValue !== null && <span className="support-mv">MV {card.manaValue}</span>}
           {card.isGameChanger && (
             <span className="support-gc" title="On the Game Changers list">
               GC
