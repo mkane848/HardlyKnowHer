@@ -24,6 +24,12 @@ the server's URL automatically.
   deploy to be slower than a typical Node app.
 - The client build reads the server's assigned hostname and bakes it in as
   `VITE_API_URL`.
+- The client's About dialog shows a "Updated" timestamp taken from `git log
+  -1` on the commit the build ran against — Render always builds from a
+  fresh checkout of what was just pushed, so this lands within seconds of
+  the real deploy with nothing to hand-maintain. If you ever build from a
+  source tarball with no `.git` directory, this silently falls back to the
+  literal build time instead of failing.
 
 ## Good to know
 

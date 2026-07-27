@@ -9,6 +9,12 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Added
+
+- The About dialog now shows when the app was last updated, alongside the
+  version number. Taken from the build's commit date, not hand-maintained,
+  so it can't go stale the way a manually-typed date would.
+
 ### Changed
 
 - A creature type now only counts if the commander's own rules text cares

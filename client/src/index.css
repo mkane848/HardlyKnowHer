@@ -1355,6 +1355,10 @@ body {
   margin: 0.2rem 0 0;
 }
 
+.about-build-date {
+  opacity: 0.75;
+}
+
 .about-blurb {
   font-size: 0.88rem;
   line-height: 1.55;

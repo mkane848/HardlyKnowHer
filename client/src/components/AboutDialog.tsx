@@ -3,6 +3,16 @@ import type { ReactNode } from 'react';
 
 const REPO_URL = 'https://github.com/mkane848/HardlyKnowHer';
 
+// Formatted once at module load, not per render — it never changes within a
+// page's lifetime. Shown in the visitor's own locale and time zone (the
+// no-argument form of toLocaleString) rather than a fixed one, since "when
+// was this updated" is more useful relative to the reader's own clock than
+// in a zone they'd have to convert.
+const formattedBuildDate = new Date(__APP_BUILD_DATE__).toLocaleString(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
 /**
  * Version, credits, and a link to the source — the things a small hobby app
  * owes its users without needing its own page for them. Reuses the same
@@ -19,7 +29,9 @@ export function AboutDialog({ children }: { children: ReactNode }) {
           <div className="dialog-card about-dialog-card">
             <div className="dialog-body">
               <Dialog.Title className="dialog-name">Commander? I Hardly Know 'Er</Dialog.Title>
-              <p className="about-version">Version {__APP_VERSION__}</p>
+              <p className="about-version">
+                Version {__APP_VERSION__} <span className="about-build-date">· Updated {formattedBuildDate}</span>
+              </p>
 
               <p className="about-blurb">
                 Paste a card list, get back Commander suggestions scored against it — with an explanation
