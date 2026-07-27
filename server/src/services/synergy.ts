@@ -29,6 +29,8 @@ export interface SupportingCard {
   // Carried so the UI can show the card itself when one of these is tapped,
   // rather than making the name a dead end.
   imageUri: string | null;
+  backImageUri: string | null;
+  backName: string | null;
   scryfallUri: string | null;
 }
 
@@ -259,6 +261,8 @@ function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
     isGameChanger: !!row.game_changer,
     manaValue: row.cmc,
     imageUri: row.image_uri,
+    backImageUri: row.back_image_uri ?? null,
+    backName: row.back_name ?? null,
     scryfallUri: row.scryfall_uri,
   };
 }
@@ -399,7 +403,7 @@ function unitOracleText(unit: CommanderUnit): string {
 }
 
 // Require at least this many *citable* cards — i.e. after narrowing to this
-// specific commander's own colour identity, not the whole list's global
+// specific commander's own color identity, not the whole list's global
 // count — for a theme/kindred/keyword to count as a real signal. Checking the
 // narrowed count rather than the global one matters: a theme can show up
 // twice in the list overall but zero times among cards this commander could
@@ -417,12 +421,12 @@ const MIN_SIGNAL_COUNT = 3;
  * but meaningless matches.
  *
  * Alongside the score, each suggestion carries the cards behind every
- * signal it matched. Only cards that actually fit the commander's colour
+ * signal it matched. Only cards that actually fit the commander's color
  * identity are cited, since a card you couldn't legally run under that
  * commander is not a reason to pick it.
  *
  * Scoring measures *focus*, not reach: every signal counts for the share of
- * the commander's castable pool that backs it. Colour identity decides
+ * the commander's castable pool that backs it. Color identity decides
  * which cards are eligible and nothing more — breadth of identity is what
  * lets a commander play your cards, never a reason to prefer one.
  */
@@ -538,13 +542,13 @@ export function scoreCommanders(
       .map(toSupportingCard);
 
     // Each signal is worth how much of the *castable* pool stands behind it,
-    // not how many cards these colours happen to permit. A commander whose
+    // not how many cards these colors happen to permit. A commander whose
     // every playable card feeds one theme fits better than one that can play
     // everything and half-supports the same theme.
     //
-    // Colour identity therefore only decides which cards count (above) and
+    // Color identity therefore only decides which cards count (above) and
     // scores nothing by itself. It used to contribute the single largest
-    // term — a five-colour commander banked all of it for free, taking a
+    // term — a five-color commander banked all of it for free, taking a
     // fixed lead over any focused commander before synergy was looked at.
     const pool = Math.max(includedDistinctCount, 1);
     const density = (supporting: number) => supporting / pool;

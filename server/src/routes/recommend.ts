@@ -66,7 +66,7 @@ router.post('/recommend', (req, res) => {
 
   const suggestions = scored.map((s) => {
     // Every card in the unit counts toward the Bracket, alongside any Game
-    // Changers in the list that fit its colour identity — a Partner pair is
+    // Changers in the list that fit its color identity — a Partner pair is
     // jointly "the commander" (702.124e), so both halves' own status matters.
     const gameChangerCount = s.cards.filter((c) => c.game_changer).length + s.gameChangerCards.length;
     const colorIdentity = [...new Set(s.cards.flatMap((c) => parseJsonArray(c.color_identity)))];
@@ -77,6 +77,8 @@ router.post('/recommend', (req, res) => {
         oracleId: c.oracle_id,
         name: c.name,
         imageUri: c.image_uri,
+        backImageUri: c.back_image_uri ?? null,
+        backName: c.back_name ?? null,
         colorIdentity: parseJsonArray(c.color_identity),
         typeLine: c.type_line,
         oracleText: c.oracle_text,

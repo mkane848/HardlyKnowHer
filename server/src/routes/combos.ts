@@ -57,7 +57,7 @@ router.post('/combos', async (req, res) => {
     commanders.push(row);
   }
 
-  // Only cards that fit the commander unit's colour identity (union across
+  // Only cards that fit the commander unit's color identity (union across
   // both cards, per 702.124e) — the rest could not go in the deck, so a
   // combo involving them would be misleading.
   const identity = new Set(commanders.flatMap((c) => parseJsonArray(c.color_identity)));

@@ -50,6 +50,8 @@ function makeCard(overrides: Partial<CardRow> = {}): CardRow {
     is_legendary: 1,
     is_commander_eligible: 1,
     image_uri: null,
+    back_image_uri: null,
+    back_name: null,
     ...overrides,
   };
 }
@@ -103,7 +105,7 @@ check('buildCollectionProfile detects themes from oracle text', () => {
 
 // --- scoreCommanders: identity + signal gating -----------------------------
 
-check('a candidate with zero colour-identity overlap is not suggested', () => {
+check('a candidate with zero color-identity overlap is not suggested', () => {
   const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['W']) });
   const candidate = makeCard({
     name: 'Candidate',
@@ -156,7 +158,7 @@ check('summed quantity of one card is not enough — the threshold counts distin
   assert.strictEqual(suggestions.length, 0);
 });
 
-check('a candidate is suggested once colour identity fits and a signal clears the threshold', () => {
+check('a candidate is suggested once color identity fits and a signal clears the threshold', () => {
   const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
   const candidate = makeCard({
     name: 'Candidate',
@@ -229,7 +231,7 @@ check("a matched theme still requires the candidate's own text to show the same 
 
 check('a theme with enough global matches but too few after identity-narrowing is dropped entirely', () => {
   // Three sacrifice cards match globally, but only two of them are actually
-  // playable under this candidate's colour identity — below the threshold
+  // playable under this candidate's color identity — below the threshold
   // once narrowed, so this should affect scoring, not just display.
   const fitsA = makeCard({ name: 'Fits A', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
   const fitsB = makeCard({ name: 'Fits B', color_identity: JSON.stringify(['B']), oracle_text: 'Sacrifice a creature.' });
@@ -252,7 +254,7 @@ check('a theme with enough global matches but too few after identity-narrowing i
   assert.strictEqual(suggestions.length, 0);
 });
 
-check("only cards that fit the candidate's colour identity count toward includedCardCount", () => {
+check("only cards that fit the candidate's color identity count toward includedCardCount", () => {
   const fits = sacrificeCards(3, { color_identity: JSON.stringify(['B']) });
   const doesNotFit = makeCard({
     name: 'Does Not Fit',
@@ -441,11 +443,11 @@ check('a pair matches a type only one half cares about (702.124e)', () => {
   assert.deepStrictEqual(suggestions[0]?.matchedCreatureTypes, ['Sliver']);
 });
 
-// --- scoring measures focus, not colour reach ------------------------------
+// --- scoring measures focus, not color reach ------------------------------
 
 check('a focused commander outranks a wider one that matches less', () => {
-  // The bug this replaced: colour identity used to be worth more than every
-  // synergy term combined, so a five-colour commander that could cast the
+  // The bug this replaced: color identity used to be worth more than every
+  // synergy term combined, so a five-color commander that could cast the
   // whole list beat a mono-black one that actually matched it twice over.
   const black = Array.from({ length: 6 }, (_, i) =>
     makeCard({
@@ -467,7 +469,7 @@ check('a focused commander outranks a wider one that matches less', () => {
     oracle_text: 'Return a card from your graveyard to your hand. You gain 1 life.',
   });
   const wubrg = makeCard({
-    name: 'Five-Colour Generalist',
+    name: 'Five-Color Generalist',
     color_identity: JSON.stringify(['W', 'U', 'B', 'R', 'G']),
     oracle_text: 'Exile a card from your graveyard.',
   });
@@ -477,7 +479,7 @@ check('a focused commander outranks a wider one that matches less', () => {
   const suggestions = scoreCommanders([solo(wubrg), solo(mono)], profile, ownedEntries);
 
   // Mono-black matches two themes at full density across its 6 castable
-  // cards; the five-colour one matches a single theme and earns nothing for
+  // cards; the five-color one matches a single theme and earns nothing for
   // being able to cast twice as much.
   assert.strictEqual(suggestions[0].cards[0].name, 'Mono-Black Synergist');
   assert.strictEqual(suggestions[0].score, 20);
@@ -485,7 +487,7 @@ check('a focused commander outranks a wider one that matches less', () => {
 });
 
 check('breadth alone never scores — identity only decides what is eligible', () => {
-  // Same signal, same density, different colour reach: the scores must match.
+  // Same signal, same density, different color reach: the scores must match.
   const cards = (identity: string[], n: number, prefix: string) =>
     Array.from({ length: n }, (_, i) =>
       makeCard({
@@ -551,7 +553,7 @@ check('suggestions are sorted by score, highest first', () => {
 
 // --- Partner-pair union semantics (702.124e) -------------------------------
 
-check("a pair's colour identity is the union of both cards, not either alone", () => {
+check("a pair's color identity is the union of both cards, not either alone", () => {
   const ownedCards = sacrificeCards(3, { color_identity: JSON.stringify(['U']) });
   const partnerA = makeCard({ name: 'A', color_identity: JSON.stringify(['U']) });
   const partnerB = makeCard({

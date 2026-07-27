@@ -23,9 +23,9 @@ const LEADING_QTY = /^(\d+)\s*x?\s+(.+)$/i;
 // Trailing metadata the export sites append after the card name. These are
 // applied repeatedly rather than once, because the sites combine them in
 // different orders — Archidekt can emit set code, collector number, foil
-// marker, category and colour label all on one line.
+// marker, category and color label all on one line.
 const TRAILING_NOISE: RegExp[] = [
-  // Archidekt colour label: "^Have,#7289DA^"
+  // Archidekt color label: "^Have,#7289DA^"
   /\s*\^[^^]*\^$/,
   // Moxfield/MTGO markers: "*F*" (foil), "*CMDR*" (commander)
   /\s*\*[^*]*\*$/,
