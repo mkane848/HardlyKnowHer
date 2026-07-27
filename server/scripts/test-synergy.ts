@@ -309,6 +309,41 @@ check('a single matching component theme is not enough for Aristocrats', () => {
   assert.ok(suggestions[0].matchedThemes.includes('Sacrifice'));
 });
 
+// --- sacrifice requires sacrificing something, not itself ------------------
+
+check('a fetch land sacrificing itself is not a Sacrifice signal', () => {
+  // Arid Mesa's actual line: "..., Sacrifice Arid Mesa: Search your
+  // library...". It sacrifices only itself as a cost, which reads
+  // nothing like the creature-sacrifice archetype even though the bare
+  // word "sacrifice" appears.
+  const fetches = Array.from({ length: 3 }, (_, i) =>
+    makeCard({
+      name: `Fetch ${i}`,
+      type_line: 'Land',
+      color_identity: JSON.stringify(['R', 'W']),
+      oracle_text: `Sacrifice Fetch ${i}: Search your library for a Mountain or Plains card.`,
+    })
+  );
+  const profile = buildCollectionProfile(fetches.map((c) => owned(c)));
+  assert.strictEqual(profile.themeCounts['sacrifice'], undefined);
+});
+
+check('sacrificing a creature, an indefinite object, still counts', () => {
+  const village = makeCard({ name: 'Village Rites', oracle_text: 'As an additional cost to cast this spell, sacrifice a creature.' });
+  const woe = makeCard({ name: 'Woe Strider', oracle_text: 'Sacrifice another creature or artifact: scry 1.' });
+  const profile = buildCollectionProfile([owned(village), owned(woe)]);
+  assert.strictEqual(profile.themeCounts['sacrifice'], 2);
+});
+
+// --- "Card Draw" is not its own synergy -------------------------------------
+
+check('drawing cards alone is not detected as a theme', () => {
+  const drawer = makeCard({ oracle_text: 'Draw a card.' });
+  const profile = buildCollectionProfile([owned(drawer, 5)]);
+  assert.strictEqual(profile.themeCounts['draw'], undefined);
+  assert.deepStrictEqual(Object.keys(profile.themeCards).includes('draw'), false);
+});
+
 // --- kindred requires caring, not just sharing -----------------------------
 
 /** N distinct creatures of one type, so a kindred signal can clear the threshold. */
@@ -416,7 +451,7 @@ check('a focused commander outranks a wider one that matches less', () => {
     makeCard({
       name: `Black ${i}`,
       color_identity: JSON.stringify(['B']),
-      oracle_text: 'Return a card from your graveyard to your hand. Draw a card.',
+      oracle_text: 'Return a card from your graveyard to your hand. You gain 1 life.',
     })
   );
   const azorius = Array.from({ length: 6 }, (_, i) =>
@@ -429,7 +464,7 @@ check('a focused commander outranks a wider one that matches less', () => {
   const mono = makeCard({
     name: 'Mono-Black Synergist',
     color_identity: JSON.stringify(['B']),
-    oracle_text: 'Return a card from your graveyard to your hand. Draw a card.',
+    oracle_text: 'Return a card from your graveyard to your hand. You gain 1 life.',
   });
   const wubrg = makeCard({
     name: 'Five-Colour Generalist',
