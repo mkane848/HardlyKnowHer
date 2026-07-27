@@ -164,7 +164,7 @@ client/                Vite + React + TS + Zustand + TanStack Query/Table
       sort.ts                 SortMode ('relevance' | 'colorNameValue'); compares a unit's
                                joined display name and summed mana value across its 1-2 cards
       suggestions.ts           "still has supporting cards after the identity filter" helpers
-                               (visibleThemeSupport/visibleTribeSupport/visibleKeywordSupport)
+                               (visibleThemeSupport/visibleKindredSupport/visibleKeywordSupport)
                                shared by the card display and the filter bar's option lists
       manaSymbols.ts           inlined SVG path data for the 6 mana glyphs
     types/index.ts          DTOs mirroring the server's response shape — a suggestion is
@@ -292,17 +292,30 @@ server/                Express + TS + better-sqlite3
      would just duplicate the same detection twice.
   3. Scores every `CommanderUnit` from `partners.ts` (not a single `CardRow`
      — see above): requires nonzero color-identity overlap AND at least one
-     tribal/theme/keyword/archetype signal to even be considered. A signal
+     kindred/theme/keyword/archetype signal to even be considered. A signal
      counts only if at least `MIN_SIGNAL_COUNT` (3) *distinct* cards back it
      **after** narrowing to that unit's colour identity. Every signal is
      unioned across both cards in a pair (`unitColorIdentity`/
-     `unitCreatureTypes`/`unitKeywords`/`unitOracleText`) per rule 702.124e
-     — a Partner pair matches anything either half of it would match solo,
-     and its combined color identity is the union, not the intersection.
+     `unitKeywords`/`unitOracleText`) per rule 702.124e — a Partner pair
+     matches anything either half of it would match solo, and its combined
+     color identity is the union, not the intersection.
+
+     **Kindred requires caring, not sharing** (`caresAboutCreatureType`).
+     A creature type counts only if the unit's own oracle text names it —
+     Krenko counts Goblins, Lathril taps Elves, The First Sliver gives
+     Sliver spells cascade. Merely *having* the type does nothing, which is
+     why Silas Renn no longer collects a "Human" tag off a list that happens
+     to hold Humans. The commander need not have the type at all
+     (Ghoulcaller Gisa is a Human Wizard Zombie commander), so this reads
+     the text rather than the type line. `pluralOfType` handles the
+     irregular plurals Magic actually uses — Elf/**Elves** matters, since
+     Lathril's text never says "Elf". Note this is the one signal whose
+     gate is per-unit text rather than a shared profile lookup, so the
+     candidate type list is narrowed once outside the scoring loop.
 
      Each signal then scores its **density**: the share of the unit's
      castable pool (distinct cards fitting its identity) that backs it,
-     times a per-kind weight — `tribal * 15 + theme * 10 + keyword * 8 +
+     times a per-kind weight — `kindred * 15 + theme * 10 + keyword * 8 +
      archetype * 20`. So a signal every playable card supports is worth its
      full weight; one that half of them support is worth half.
 
@@ -505,9 +518,9 @@ which was carried forward on top of the kept design:
 - **Mobile layout** — `viewport-fit=cover` + the `env(safe-area-inset-*)`
   padding in `index.css`, so content clears notches/home-indicator/URL bar.
 - **"Still has supporting cards" fix** — `lib/suggestions.ts`
-  (`visibleThemeSupport`/`visibleTribeSupport`, extended here with a
+  (`visibleThemeSupport`/`visibleKindredSupport`, extended here with a
   `visibleKeywordSupport` for the keyword category main didn't have): a
-  theme/tribe/keyword matched against the collection *globally* can end up
+  theme/kindred type/keyword matched against the collection *globally* can end up
   with zero cards once narrowed to a specific commander's colour identity;
   this filters those out of both the card display and the filter bar's
   available options instead of showing/offering an empty reason. This was

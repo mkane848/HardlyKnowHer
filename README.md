@@ -23,6 +23,14 @@ and an estimated power Bracket.
    legal Partner/Background pairing (see below) — against that profile and
    returns the best matches, each tagged with an estimated Bracket.
 
+**On kindred (what used to be called "tribal"):** a creature type only counts
+if the commander's own rules text *cares* about it — merely being that type is
+not enough. Krenko counts Goblins, Lathril taps Elves, Edgar Markov triggers
+on Vampire spells; Silas Renn is a Human whose text never mentions Humans, so
+a pile of Humans says nothing about him. A commander does not have to *be* the
+type it cares about, since Ghoulcaller Gisa is a Human Wizard and one of the
+best Zombie commanders in the format.
+
 **On what scoring rewards:** a commander is scored on how *focused* a fit it
 is, not how much of your list it can legally cast. Each signal counts for the
 share of that commander's playable cards standing behind it, so a mono-black
@@ -168,7 +176,7 @@ Each suggestion has a **"Why this commander?"** disclosure. Expanding it shows
 every creature type, keyword, and theme it shares with your list, the
 specific cards behind each of those signals, and which cards drive the
 Bracket estimate. Only cards that fit the commander's colour identity are
-cited, and a theme/tribe/keyword only counts — both as a reason shown here
+cited, and a theme/kindred type/keyword only counts — both as a reason shown here
 and toward whether the commander is suggested at all — if it still has at
 least three citable cards once narrowed that way. A global match that
 thins out to one or two cards once narrowed to this commander's own colours
@@ -210,7 +218,7 @@ and `handoff.md` for the plan.
   count → WUBRG order → name → mana value.
 - Each suggestion's badge row shows a **match score**, relative to the best
   match currently on screen (the top suggestion always reads 100%). Hover
-  or tap it for a breakdown of what drove the score — the tribal, theme and
+  or tap it for a breakdown of what drove the score — the kindred, theme and
   keyword signals it matched, and the pool they were weighed against.
 - **Export** the current list via "Copy list" or "Download .txt".
 - **Dismiss** individual suggestions (restorable) and page through the rest.
@@ -269,7 +277,7 @@ See [`DEPLOY.md`](./DEPLOY.md) for a free, one-click Render setup (the repo's
 
 ## Known limitations (v1)
 
-- Synergy detection is theme/tribal-pattern matching on oracle text, not a
+- Synergy detection is theme/kindred-pattern matching on oracle text, not a
   full combo or archetype model — it'll miss subtler synergies.
 - Bracket estimate only accounts for Game Changers, not combos/MLD/extra
   turns (see above).
