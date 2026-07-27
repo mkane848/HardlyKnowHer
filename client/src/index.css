@@ -976,6 +976,22 @@ body {
   margin: 0;
 }
 
+/* Combos' heading + its "Hide/Show results" toggle, and the results' own
+   "Searched N cards" line + page-size picker — both need the label on the
+   left and a control pinned to the right without wrapping onto its own line. */
+.explain-section-header,
+.explain-group-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.explain-group-header .explain-group-desc {
+  margin: 0;
+}
+
 /* A <details>, so each group's cards start collapsed — expanding "Why this
    commander?" should show the shape of the reasoning at a glance, not a
    page-length wall of card names. Block rather than flex: a <details> has no
@@ -997,18 +1013,27 @@ body {
   align-items: baseline;
   gap: 0.5rem;
   flex-wrap: wrap;
-  cursor: pointer;
   padding: 0.1rem 0;
+}
+
+/* The click-to-expand affordance (pointer cursor, chevron) belongs only to
+   an actual <summary> — CommanderCard's kindred/theme/keyword/Game Changer
+   groups. ComboFinder's Ready-to-go/Almost-there groups share the base
+   .explain-group-title typography above but are plain, non-collapsible <p>s
+   (each is already bounded by its own pagination instead), so they must not
+   inherit a "this expands" affordance that does nothing on click. */
+summary.explain-group-title {
+  cursor: pointer;
   /* Suppress the native marker in both engines — the chevron below replaces
      it, so it can sit at the end of the row rather than crowding the label. */
   list-style: none;
 }
 
-.explain-group-title::-webkit-details-marker {
+summary.explain-group-title::-webkit-details-marker {
   display: none;
 }
 
-.explain-group-title::after {
+summary.explain-group-title::after {
   content: '▾';
   display: inline-block;
   margin-left: auto;
@@ -1017,12 +1042,12 @@ body {
   transition: transform 120ms ease;
 }
 
-.explain-group[open] > .explain-group-title::after {
+.explain-group[open] > summary.explain-group-title::after {
   transform: rotate(180deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .explain-group-title::after {
+  summary.explain-group-title::after {
     transition: none;
   }
 }
@@ -1065,10 +1090,19 @@ body {
   border-top: 1px solid var(--parchment-dim);
 }
 
-.support-name {
+.support-name-wrap {
   flex: 1;
+  /* Lets the name truncate instead of overflowing past the mana value and
+     GC badges — a plain flex child has no min-width by default, so its
+     content would keep the row as wide as the longest name. */
+  min-width: 0;
+}
+
+.support-name {
   /* A button, but it reads as the list's text — the underline on hover is
      what says it's tappable, rather than a control's chrome in every row. */
+  display: block;
+  width: 100%;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -1076,6 +1110,9 @@ body {
   border: 0;
   padding: 0;
   cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .support-name:hover,
@@ -1084,11 +1121,42 @@ body {
   color: #7a5615;
 }
 
+/* Portalled to <body> by Radix HoverCard, so it escapes .support-cards'
+   own overflow: hidden (there for its rounded-corner row backgrounds)
+   instead of being clipped by it. */
+.card-hover-preview {
+  width: 200px;
+  max-width: 60vw;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  line-height: 0;
+}
+
+.card-hover-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* A standard card's proportions, reserved up front — without this the box
+     is 0-height until the image finishes loading, so it either doesn't
+     render at all yet or pops in and shoves the page under it once it does. */
+  aspect-ratio: 63 / 88;
+  background: var(--ink-raised);
+  object-fit: cover;
+}
+
 .support-qty {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--ink-text-muted);
   min-width: 1.5em;
+}
+
+.support-mv {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-text-muted);
+  white-space: nowrap;
 }
 
 .support-gc {

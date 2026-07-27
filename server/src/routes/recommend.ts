@@ -8,12 +8,6 @@ import { applySingletonLimits } from '../services/singleton';
 
 const router = Router();
 
-// Deep enough that the client's colour/bracket/theme filters have something
-// to narrow, while staying a single response — the client paginates it.
-// Scoring already ran over every eligible commander, so a larger slice costs
-// nothing but response size.
-const MAX_SUGGESTIONS = 30;
-
 function parseJsonArray(value: string | null): string[] {
   if (!value) return [];
   try {
@@ -64,7 +58,11 @@ router.post('/recommend', (req, res) => {
   const candidates = getCommanderCandidates();
   const backgrounds = getBackgroundCards();
   const units = buildCommanderUnits(candidates, backgrounds);
-  const scored = scoreCommanders(units, profile, owned).slice(0, MAX_SUGGESTIONS);
+  // Every suggestion that cleared scoreCommanders' own bar (identity fit +
+  // at least one real signal) is returned — no further slicing. The client
+  // owns pagination over the full set, since it also needs the whole thing
+  // for the filter bar's counts and options.
+  const scored = scoreCommanders(units, profile, owned);
 
   const suggestions = scored.map((s) => {
     // Every card in the unit counts toward the Bracket, alongside any Game

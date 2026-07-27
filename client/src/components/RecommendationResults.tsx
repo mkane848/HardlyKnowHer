@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getCoreRowModel,
   getPaginationRowModel,
   useReactTable,
   type ColumnDef,
+  type PaginationState,
 } from '@tanstack/react-table';
 import { useAppStore } from '../store/useAppStore';
+import { usePreferencesStore } from '../store/usePreferencesStore';
 import { useRecommendations } from '../api/queries';
 import { applyFilters, availableFilterValues, EMPTY_FILTERS, hasActiveFilters } from '../lib/filters';
 import { sortSuggestions, type SortMode } from '../lib/sort';
@@ -13,7 +15,6 @@ import { CommanderCard } from './CommanderCard';
 import { ResultFilters } from './ResultFilters';
 import type { CommanderSuggestionDTO } from '../types';
 
-const PAGE_SIZE = 9;
 const EXPORT_FILENAME = 'commander-suggestions.txt';
 
 function toExportText(suggestions: CommanderSuggestionDTO[]): string {
@@ -72,6 +73,17 @@ export function RecommendationResults() {
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sortMode, setSortMode] = useState<SortMode>('relevance');
+  const suggestionsPerPage = usePreferencesStore((s) => s.suggestionsPerPage);
+  const setSuggestionsPerPage = usePreferencesStore((s) => s.setSuggestionsPerPage);
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: suggestionsPerPage });
+
+  // The table's pagination is controlled (below) so the page-size preference
+  // can drive it after mount, not just seed it once. Landing back on page 1
+  // avoids being stranded on a page number that no longer exists once the
+  // page is shorter.
+  useEffect(() => {
+    setPagination({ pageIndex: 0, pageSize: suggestionsPerPage });
+  }, [suggestionsPerPage]);
 
   const suggestions = useMemo(() => result?.suggestions ?? [], [result]);
 
@@ -104,7 +116,8 @@ export function RecommendationResults() {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: PAGE_SIZE } },
+    state: { pagination },
+    onPaginationChange: setPagination,
   });
 
   if (error) {
@@ -170,6 +183,8 @@ export function RecommendationResults() {
             hasMulticolor={hasMulticolor}
             sortMode={sortMode}
             onSortModeChange={setSortMode}
+            pageSize={suggestionsPerPage}
+            onPageSizeChange={setSuggestionsPerPage}
             shown={filtered.length}
             total={kept.length}
           />

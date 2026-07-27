@@ -155,6 +155,12 @@ client/                Vite + React + TS + Zustand + TanStack Query/Table
     main.tsx, App.tsx     entry point / page shell / navbar
     index.css              design system: parchment/ink palette, mana pips
     store/useAppStore.ts   client state only: rawList, submittedList, dismissed
+    store/usePreferencesStore.ts  durable UI prefs (results-per-page), persisted to
+                                   localStorage via zustand/middleware — deliberately a
+                                   separate store from useAppStore, which is NOT persisted
+                                   (dismissals surviving a browser restart against
+                                   whatever list is pasted in next would be surprising;
+                                   a page-size choice should outlive the tab)
     api/
       client.ts             fetchRecommendations/fetchCombos, wakeServer, cold-start retry
       queries.ts             TanStack Query hooks wrapping the above
@@ -175,7 +181,15 @@ client/                Vite + React + TS + Zustand + TanStack Query/Table
       RecommendationResults.tsx  filter bar + sort + export controls + paginated suggestion grid
       ResultFilters.tsx          color/color-category/bracket/theme filter controls + sort dropdown
       CommanderCard.tsx          one suggestion: pips, one `CommanderFace` per card (1 or 2),
-                                  "why" disclosure; art wrapped in CardImageDialog per face
+                                  "why" disclosure; art wrapped in CardImageDialog per face.
+                                  Cited supporting cards get a hover-only art preview
+                                  (`SupportingCardName`, @radix-ui/react-hover-card,
+                                  portalled so `.support-cards`' own `overflow: hidden`
+                                  can't clip it) alongside the existing click-to-open
+                                  CardImageDialog — hover is additive for pointer devices;
+                                  touch has no hover, but tapping already opens the full
+                                  dialog, which is a better view on a small screen than a
+                                  thumbnail your own finger would be covering anyway.
       CardDetailDialog.tsx        full rules-text modal for one card of a unit (art, mana cost,
                                    full text, Scryfall link); takes `card` + the unit's `bracket`
       CardImageDialog.tsx         whole-card art-only preview (no rules text) — separate from
@@ -183,7 +197,13 @@ client/                Vite + React + TS + Zustand + TanStack Query/Table
                                    cited supporting card's name
       ManaSymbol.tsx, ManaCost.tsx  render mana pips / a full cost string
       ComboFinder.tsx             click-to-run Commander Spellbook lookup inside a suggestion;
-                                   takes `commanderNames: string[]` (1 or 2) for pair support
+                                   takes `commanderNames: string[]` (1 or 2) for pair support.
+                                   Ready-to-go/Almost-there each paginate independently
+                                   (`ComboList`'s own `pageIndex` state) at
+                                   usePreferencesStore's `combosPerPage`; the whole results
+                                   block can be hidden after fetching without discarding
+                                   the query (TanStack Query still has it cached — collapsing
+                                   is a view-state toggle, not a re-fetch)
       AboutDialog.tsx             version, credits, repo link
   scripts/                 npm test — dependency-free node:assert + tsx, no framework
     fixtures.ts               makeSuggestion/makeCommanderCard/makeSupportingCard test builders
@@ -200,7 +220,13 @@ server/                Express + TS + better-sqlite3
     types.ts                CardRow shape (mirrors the cards table), incl. partner_ability/
                              partner_target/is_background (rule 702.124)
     routes/
-      recommend.ts            POST /api/recommend
+      recommend.ts            POST /api/recommend — returns every suggestion scoreCommanders
+                               clears its own bar for, uncapped; no server-side slice. The
+                               client owns pagination over the full set (RecommendationResults.tsx,
+                               controlled TanStack Table pagination state driven by
+                               usePreferencesStore's `suggestionsPerPage`), since it also needs
+                               the whole thing for the filter bar's counts and option lists —
+                               truncating server-side would make both of those lie.
       combos.ts                POST /api/combos — proxies to Commander Spellbook, on request only;
                                 takes `commanderNames: string[]` (1-2) for a Partner unit
     services/
@@ -281,8 +307,21 @@ server/                Express + TS + better-sqlite3
      `keywords` field — e.g. a Flying-heavy list), and counts against a set
      of hand-picked oracle-text theme regexes (sacrifice, graveyard,
      +1/+1 counters, tokens, artifacts, enchantments, planeswalkers,
-     equipment, auras, spellslinger, lifegain, draw, mill, death triggers,
-     landfall, reanimation, doublers/multipliers).
+     equipment, auras, spellslinger, lifegain, mill, death triggers,
+     landfall, reanimation, doublers/multipliers). There is deliberately no
+     standalone "card draw" theme — drawing cards isn't a synergy or an
+     archetype on its own the way sacrifice or tokens are; almost every deck
+     draws cards, so it added noise ("Themes: Card Draw" on nearly anything
+     that could draw a card) rather than signal.
+
+     `sacrifice`'s pattern requires an indefinite object right after the
+     word — `/\bsacrifice (a|an|another|your|this|that|target|it|them|up to
+     \w+|one|two|three|four|five|\d+)\b/i` — not a bare `/sacrifice/i`. A
+     fetch land's own text reads "Sacrifice Arid Mesa: …": it sacrifices
+     only itself, by its own proper name, as a cost for an unrelated effect.
+     That is not the creature/permanent-sacrifice archetype even though the
+     literal word appears, and a bare match was counting every fetch land
+     in the format toward it.
   2. `ARCHETYPES` is a second layer on top of the theme list: a named label
      (Aristocrats, Voltron) for a *combination* of themes, applied when a
      candidate matches enough of the archetype's component theme keys.

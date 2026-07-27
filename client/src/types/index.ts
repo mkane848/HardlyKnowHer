@@ -10,6 +10,7 @@ export interface SupportingCardDTO {
   quantity: number;
   typeLine: string | null;
   isGameChanger: boolean;
+  manaValue: number | null;
   imageUri: string | null;
   scryfallUri: string | null;
 }

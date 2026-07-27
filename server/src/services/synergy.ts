@@ -25,6 +25,7 @@ export interface SupportingCard {
   quantity: number;
   typeLine: string | null;
   isGameChanger: boolean;
+  manaValue: number | null;
   // Carried so the UI can show the card itself when one of these is tapped,
   // rather than making the name a dead end.
   imageUri: string | null;
@@ -96,7 +97,19 @@ function matchesTheme(theme: ThemeDef, text: string): boolean {
 // Magic strategy. `description` is user-facing: it explains what the theme
 // means when a suggestion is expanded.
 const THEMES: ThemeDef[] = [
-  theme('sacrifice', 'Sacrifice', 'Cards that sacrifice creatures or other permanents for value.', /sacrifice/i),
+  theme(
+    'sacrifice',
+    'Sacrifice',
+    'Cards that sacrifice creatures or other permanents for value.',
+    // Requires an indefinite object ("a/another/target/this/three/…")
+    // right after "sacrifice", not a specific card name. A fetch land's
+    // own text reads "Sacrifice Arid Mesa: …" — it sacrifices only
+    // itself, as a cost for an unrelated effect, which is not this
+    // synergy even though the literal word "sacrifice" appears. Real
+    // sacrifice-for-value cards are templated as "Sacrifice a
+    // creature:", "sacrifice another artifact", "sacrifice it", etc.
+    /\bsacrifice (a|an|another|your|this|that|target|it|them|up to \w+|one|two|three|four|five|\d+)\b/i
+  ),
   theme(
     'graveyard',
     'Graveyard',
@@ -148,7 +161,6 @@ const THEMES: ThemeDef[] = [
     /instant and sorcery spells? (you cast )?costs? \{?\d/i
   ),
   theme('lifegain', 'Lifegain', 'Cards that gain life, or that trigger when you do.', /gain(s|ed)? \d*\s*life/i, /whenever you gain life/i),
-  theme('draw', 'Card Draw', 'Cards that refill your hand.', /draw (a|two|three|\d+) cards?/i),
   theme(
     'mill',
     'Mill',
@@ -245,6 +257,7 @@ function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
     quantity,
     typeLine: row.type_line,
     isGameChanger: !!row.game_changer,
+    manaValue: row.cmc,
     imageUri: row.image_uri,
     scryfallUri: row.scryfall_uri,
   };

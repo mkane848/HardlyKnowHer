@@ -11,6 +11,7 @@ import {
   type SuggestionFilters,
 } from '../lib/filters';
 import { SORT_MODE_LABELS, type SortMode } from '../lib/sort';
+import { SUGGESTIONS_PAGE_SIZE_OPTIONS } from '../store/usePreferencesStore';
 
 interface Props {
   filters: SuggestionFilters;
@@ -21,6 +22,8 @@ interface Props {
   hasMulticolor: boolean;
   sortMode: SortMode;
   onSortModeChange: (mode: SortMode) => void;
+  pageSize: number;
+  onPageSizeChange: (size: number) => void;
   shown: number;
   total: number;
 }
@@ -88,6 +91,8 @@ export function ResultFilters({
   hasMulticolor,
   sortMode,
   onSortModeChange,
+  pageSize,
+  onPageSizeChange,
   shown,
   total,
 }: Props) {
@@ -195,6 +200,20 @@ export function ResultFilters({
             {(Object.entries(SORT_MODE_LABELS) as [SortMode, string][]).map(([mode, label]) => (
               <option key={mode} value={mode}>
                 {label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Remembered across visits (see usePreferencesStore) — a page size
+            picked once is a standing preference, not a one-off for this
+            list. */}
+        <label className="sort-control">
+          <span className="filter-label">Show</span>
+          <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+            {SUGGESTIONS_PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
               </option>
             ))}
           </select>

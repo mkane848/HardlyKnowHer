@@ -1,46 +1,88 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { usePreferencesStore, COMBOS_PAGE_SIZE_OPTIONS } from '../store/usePreferencesStore';
 import { useCombos } from '../api/queries';
 import type { ComboDTO } from '../types';
 
-function ComboList({ combos, showMissing }: { combos: ComboDTO[]; showMissing?: boolean }) {
+/**
+ * One "Ready to go" or "Almost there" group, paginated on its own — a
+ * commander with a lot of combo pieces in your list can turn up enough of
+ * either to stretch the page well past the fold on their own, same problem
+ * as an uncapped suggestion grid.
+ */
+function ComboList({ combos, showMissing, pageSize }: { combos: ComboDTO[]; showMissing?: boolean; pageSize: number }) {
+  const [pageIndex, setPageIndex] = useState(0);
+  // A shorter list, or a changed page-size preference, can leave pageIndex
+  // pointing past the end — land back on page 1 rather than an empty page.
+  useEffect(() => setPageIndex(0), [combos, pageSize]);
+
+  const pageCount = Math.max(1, Math.ceil(combos.length / pageSize));
+  const clampedIndex = Math.min(pageIndex, pageCount - 1);
+  const page = combos.slice(clampedIndex * pageSize, clampedIndex * pageSize + pageSize);
+
   return (
-    <ul className="combo-list">
-      {combos.map((combo, index) => (
-        <li key={combo.id ?? index} className="combo-item">
-          <p className="combo-cards">{combo.cards.join(' + ')}</p>
+    <>
+      <ul className="combo-list">
+        {page.map((combo) => (
+          <li key={combo.id ?? combo.cards.join('+')} className="combo-item">
+            <p className="combo-cards">{combo.cards.join(' + ')}</p>
 
-          {combo.produces.length > 0 && (
-            <p className="combo-produces">
-              <span className="combo-arrow" aria-hidden="true">
-                →
-              </span>
-              <span className="combo-produces-list">{combo.produces.join(', ')}</span>
-            </p>
-          )}
+            {combo.produces.length > 0 && (
+              <p className="combo-produces">
+                <span className="combo-arrow" aria-hidden="true">
+                  →
+                </span>
+                <span className="combo-produces-list">{combo.produces.join(', ')}</span>
+              </p>
+            )}
 
-          {showMissing && combo.missing.length > 0 && (
-            <p className="combo-missing">Missing: {combo.missing.join(', ')}</p>
-          )}
+            {showMissing && combo.missing.length > 0 && (
+              <p className="combo-missing">Missing: {combo.missing.join(', ')}</p>
+            )}
 
-          {/* Steps can run to a full paragraph of rules text — collapsed by
-              default so a handful of combos doesn't turn into a wall of text
-              to scroll past just to compare which ones are worth chasing. */}
-          {combo.description && (
-            <details className="combo-steps-details">
-              <summary>Steps</summary>
-              <p className="combo-steps">{combo.description}</p>
-            </details>
-          )}
+            {/* Steps can run to a full paragraph of rules text — collapsed by
+                default so a handful of combos doesn't turn into a wall of text
+                to scroll past just to compare which ones are worth chasing. */}
+            {combo.description && (
+              <details className="combo-steps-details">
+                <summary>Steps</summary>
+                <p className="combo-steps">{combo.description}</p>
+              </details>
+            )}
 
-          {combo.permalink && (
-            <a className="combo-link" href={combo.permalink} target="_blank" rel="noreferrer noopener">
-              View on Commander Spellbook
-            </a>
-          )}
-        </li>
-      ))}
-    </ul>
+            {combo.permalink && (
+              <a className="combo-link" href={combo.permalink} target="_blank" rel="noreferrer noopener">
+                View on Commander Spellbook
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {pageCount > 1 && (
+        <nav className="pagination" aria-label="Combo pages">
+          <button
+            type="button"
+            className="page-button"
+            onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+            disabled={clampedIndex === 0}
+          >
+            ← Previous
+          </button>
+          <span className="page-status" aria-live="polite">
+            Page {clampedIndex + 1} of {pageCount}
+          </span>
+          <button
+            type="button"
+            className="page-button"
+            onClick={() => setPageIndex((i) => Math.min(pageCount - 1, i + 1))}
+            disabled={clampedIndex >= pageCount - 1}
+          >
+            Next →
+          </button>
+        </nav>
+      )}
+    </>
   );
 }
 
@@ -57,15 +99,35 @@ export function ComboFinder({ commanderNames }: { commanderNames: string[] }) {
   const submittedList = useAppStore((s) => s.submittedList);
   const [requested, setRequested] = useState(false);
   const { data, error, isFetching, refetch } = useCombos(commanderNames, submittedList, requested);
+  const combosPerPage = usePreferencesStore((s) => s.combosPerPage);
+  const setCombosPerPage = usePreferencesStore((s) => s.setCombosPerPage);
+
+  // Shown by default the moment results actually land — collapsing is
+  // something the user chooses to do after seeing them, never something
+  // that hides a fresh answer to the question they just asked. Re-opens on
+  // every new `data` reference, which covers both the first fetch and a
+  // "Try again" refetch.
+  const [resultsVisible, setResultsVisible] = useState(true);
+  useEffect(() => {
+    if (data) setResultsVisible(true);
+  }, [data]);
 
   // `data` is served from cache even while disabled, so collapsing this panel
   // and reopening it shows the previous answer instead of asking again.
   const showIdle = !data && !isFetching && !error;
   const nothingFound = data && data.ready.length === 0 && data.almost.length === 0;
+  const resultCount = data ? data.ready.length + data.almost.length : 0;
 
   return (
     <section className="explain-section">
-      <h4 className="explain-heading">Combos</h4>
+      <div className="explain-section-header">
+        <h4 className="explain-heading">Combos</h4>
+        {data && !isFetching && resultCount > 0 && (
+          <button type="button" className="link-button" onClick={() => setResultsVisible((v) => !v)}>
+            {resultsVisible ? 'Hide results' : `Show ${resultCount} result${resultCount === 1 ? '' : 's'}`}
+          </button>
+        )}
+      </div>
 
       {showIdle && (
         <>
@@ -100,12 +162,29 @@ export function ComboFinder({ commanderNames }: { commanderNames: string[] }) {
         </>
       )}
 
-      {data && !isFetching && (
+      {data && !isFetching && resultsVisible && (
         <>
-          <p className="explain-group-desc">
-            Searched {data.searchedCardCount} card{data.searchedCardCount === 1 ? '' : 's'} from your list
-            {data.cached ? ' (cached)' : ''}.
-          </p>
+          <div className="explain-group-header">
+            <p className="explain-group-desc">
+              Searched {data.searchedCardCount} card{data.searchedCardCount === 1 ? '' : 's'} from your list
+              {data.cached ? ' (cached)' : ''}.
+            </p>
+            {/* A standing preference (see usePreferencesStore), not local to
+                this one commander — set once, applies to every combo list
+                from here on. */}
+            {resultCount > combosPerPage && (
+              <label className="sort-control">
+                <span className="filter-label">Show</span>
+                <select value={combosPerPage} onChange={(event) => setCombosPerPage(Number(event.target.value))}>
+                  {COMBOS_PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
 
           {nothingFound && <p className="explain-group-desc">No combos found with these cards.</p>}
 
@@ -115,7 +194,7 @@ export function ComboFinder({ commanderNames }: { commanderNames: string[] }) {
                 Ready to go <span className="explain-count">{data.ready.length}</span>
               </p>
               <p className="explain-group-desc">Every piece is already in your list.</p>
-              <ComboList combos={data.ready} />
+              <ComboList combos={data.ready} pageSize={combosPerPage} />
             </div>
           )}
 
@@ -125,7 +204,7 @@ export function ComboFinder({ commanderNames }: { commanderNames: string[] }) {
                 Almost there <span className="explain-count">{data.almost.length}</span>
               </p>
               <p className="explain-group-desc">A card or two short.</p>
-              <ComboList combos={data.almost} showMissing />
+              <ComboList combos={data.almost} showMissing pageSize={combosPerPage} />
             </div>
           )}
 
