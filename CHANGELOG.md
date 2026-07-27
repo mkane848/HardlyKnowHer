@@ -9,6 +9,15 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Changed
+
+- Each group inside "Why this commander?" — every tribe, theme, keyword,
+  and the Game Changers list — is now collapsible and starts collapsed.
+  Expanding the panel used to unroll every supporting card at once, which
+  pushed the page out far enough that the themes themselves were hard to
+  take in. The reasoning now opens as a short list of headings with their
+  counts, and any one group opens on click.
+
 ## [1.2.1] — 2026-07-27
 
 ### Fixed

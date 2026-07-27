@@ -275,15 +275,15 @@ export function CommanderCard({
               <section className="explain-section">
                 <h4 className="explain-heading">Tribal overlap</h4>
                 {tribeSupport.map((tribe) => (
-                  <div key={tribe.type} className="explain-group">
-                    <p className="explain-group-title">
+                  <details key={tribe.type} className="explain-group">
+                    <summary className="explain-group-title">
                       {tribe.type} <span className="explain-count">{cardCount(tribe.cards)} in your list</span>
-                    </p>
+                    </summary>
                     <p className="explain-group-desc">
                       Shares a creature type with this commander, so tribal payoffs line up.
                     </p>
                     <SupportingCardList cards={tribe.cards} />
-                  </div>
+                  </details>
                 ))}
               </section>
             )}
@@ -292,13 +292,13 @@ export function CommanderCard({
               <section className="explain-section">
                 <h4 className="explain-heading">Themes you're already building</h4>
                 {themeSupport.map((theme) => (
-                  <div key={theme.key} className="explain-group">
-                    <p className="explain-group-title">
+                  <details key={theme.key} className="explain-group">
+                    <summary className="explain-group-title">
                       {theme.label} <span className="explain-count">{cardCount(theme.cards)} in your list</span>
-                    </p>
+                    </summary>
                     <p className="explain-group-desc">{theme.description}</p>
                     <SupportingCardList cards={theme.cards} />
-                  </div>
+                  </details>
                 ))}
               </section>
             )}
@@ -307,16 +307,16 @@ export function CommanderCard({
               <section className="explain-section">
                 <h4 className="explain-heading">Shared keywords</h4>
                 {keywordSupport.map((kw) => (
-                  <div key={kw.keyword} className="explain-group">
-                    <p className="explain-group-title">
+                  <details key={kw.keyword} className="explain-group">
+                    <summary className="explain-group-title">
                       {kw.keyword} <span className="explain-count">{cardCount(kw.cards)} in your list</span>
-                    </p>
+                    </summary>
                     <p className="explain-group-desc">
                       This commander has {kw.keyword}, and enough of your list does too for it to be a real pattern,
                       not a coincidence.
                     </p>
                     <SupportingCardList cards={kw.cards} />
-                  </div>
+                  </details>
                 ))}
               </section>
             )}
@@ -324,10 +324,18 @@ export function CommanderCard({
             {suggestion.gameChangerCards.length > 0 && (
               <section className="explain-section">
                 <h4 className="explain-heading">Driving the Bracket estimate</h4>
-                <p className="explain-group-desc">
-                  These cards are on Wizards' Game Changers list, which is what this estimate counts.
-                </p>
-                <SupportingCardList cards={suggestion.gameChangerCards} />
+                {/* Collapsed like the signal groups above, so no one section
+                    is left stretching the panel on its own. */}
+                <details className="explain-group">
+                  <summary className="explain-group-title">
+                    Game Changers{' '}
+                    <span className="explain-count">{cardCount(suggestion.gameChangerCards)} in your list</span>
+                  </summary>
+                  <p className="explain-group-desc">
+                    These cards are on Wizards' Game Changers list, which is what this estimate counts.
+                  </p>
+                  <SupportingCardList cards={suggestion.gameChangerCards} />
+                </details>
               </section>
             )}
 

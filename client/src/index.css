@@ -952,10 +952,17 @@ body {
   margin: 0;
 }
 
+/* A <details>, so each group's cards start collapsed — expanding "Why this
+   commander?" should show the shape of the reasoning at a glance, not a
+   page-length wall of card names. Block rather than flex: a <details> has no
+   wrapper around its content, so flex would lay out the summary and every
+   sibling as flex items and fight the disclosure behaviour. */
 .explain-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  display: block;
+}
+
+.explain-group > * + * {
+  margin-top: 0.35rem;
 }
 
 .explain-group-title {
@@ -966,6 +973,34 @@ body {
   align-items: baseline;
   gap: 0.5rem;
   flex-wrap: wrap;
+  cursor: pointer;
+  padding: 0.1rem 0;
+  /* Suppress the native marker in both engines — the chevron below replaces
+     it, so it can sit at the end of the row rather than crowding the label. */
+  list-style: none;
+}
+
+.explain-group-title::-webkit-details-marker {
+  display: none;
+}
+
+.explain-group-title::after {
+  content: '▾';
+  display: inline-block;
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--ink-text-muted);
+  transition: transform 120ms ease;
+}
+
+.explain-group[open] > .explain-group-title::after {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explain-group-title::after {
+    transition: none;
+  }
 }
 
 .explain-count {
