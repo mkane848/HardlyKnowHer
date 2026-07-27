@@ -9,6 +9,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-07-27
+
 ### Added
 
 - The About dialog now shows when the app was last updated, alongside the
@@ -38,7 +40,7 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   colour identity fits inside the colours you allowed, which is why
   allowing White and Black still lists mono-black commanders. Brackets and
   themes genuinely do require, and keep their original wording.
-- Each group inside "Why this commander?" — every tribe, theme, keyword,
+- Each group inside "Why this commander?" — every kindred type, theme, keyword,
   and the Game Changers list — is now collapsible and starts collapsed.
   Expanding the panel used to unroll every supporting card at once, which
   pushed the page out far enough that the themes themselves were hard to
