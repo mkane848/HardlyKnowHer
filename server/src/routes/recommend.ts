@@ -99,7 +99,7 @@ router.post('/recommend', (req, res) => {
       matchedKeywords: s.matchedKeywords,
       includedCardCount: s.includedCardCount,
       themeSupport: s.themeSupport,
-      tribeSupport: s.tribeSupport,
+      kindredSupport: s.kindredSupport,
       keywordSupport: s.keywordSupport,
       gameChangerCards: s.gameChangerCards,
       gameChangerCount,

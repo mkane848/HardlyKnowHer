@@ -671,6 +671,30 @@ body {
   line-height: 1.25;
 }
 
+/* Both halves of a pair as one title. Slightly smaller than a solo name
+   because it carries two of them, and it wraps rather than truncating —
+   a commander's name is the one thing that must never be cut off. */
+.commander-name-pair {
+  font-size: 1.05rem;
+}
+
+.pair-plus {
+  color: var(--brass);
+  font-weight: 400;
+}
+
+/* Caption above each half's type line and rules text, telling you which card
+   the text belongs to. Deliberately quiet: the pair title above is the
+   heading, and this only needs to attribute. */
+.commander-face-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brass);
+  margin: 0;
+}
+
 .pip-row {
   display: flex;
   align-items: center;

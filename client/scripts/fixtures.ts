@@ -50,7 +50,7 @@ export function makeSuggestion(overrides: Partial<CommanderSuggestionDTO> = {}):
     matchedKeywords: [],
     includedCardCount: 0,
     themeSupport: [],
-    tribeSupport: [],
+    kindredSupport: [],
     keywordSupport: [],
     gameChangerCards: [],
     gameChangerCount: 0,

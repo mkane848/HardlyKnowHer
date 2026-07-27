@@ -39,8 +39,8 @@ export interface ThemeSupport {
   cards: SupportingCard[];
 }
 
-/** A creature type the commander shares with the list. */
-export interface TribeSupport {
+/** A creature type the commander cares about and the list can field. */
+export interface KindredSupport {
   type: string;
   cards: SupportingCard[];
 }
@@ -59,7 +59,7 @@ export interface CommanderSuggestion {
   matchedKeywords: string[];
   includedCardCount: number;
   themeSupport: ThemeSupport[];
-  tribeSupport: TribeSupport[];
+  kindredSupport: KindredSupport[];
   keywordSupport: KeywordSupport[];
   gameChangerCards: SupportingCard[];
 }
@@ -317,12 +317,55 @@ function unitColorIdentity(unit: CommanderUnit): Set<string> {
   return set;
 }
 
-function unitCreatureTypes(unit: CommanderUnit): string[] {
-  const set = new Set<string>();
-  for (const card of unit.cards) {
-    for (const t of parseJsonArray(card.creature_types)) set.add(t);
+/**
+ * The English plural of a creature type, because that is how cards refer to
+ * one in the aggregate — "Elves you control", not "Elf you control". Only the
+ * irregular endings Magic's type list actually contains are handled; anything
+ * else takes a plain -s.
+ */
+function pluralOfType(type: string): string {
+  // Elf -> Elves, Wolf -> Wolves, Dwarf -> Dwarves. Lathril, Blade of the
+  // Elves says "ten untapped Elves you control", so missing this would drop
+  // one of the most recognisable kindred commanders there is.
+  if (/f$/i.test(type)) return type.replace(/f$/i, 'ves');
+  // Sphinx -> Sphinxes, Fungus -> Funguses, Leech -> Leeches.
+  if (/(s|x|z|ch|sh)$/i.test(type)) return `${type}es`;
+  return `${type}s`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Built once per type rather than per candidate: this is tested against every
+// commander unit in the pool, which runs to thousands on a real database.
+const typeMentionCache = new Map<string, RegExp>();
+
+function typeMentionPattern(type: string): RegExp {
+  let pattern = typeMentionCache.get(type);
+  if (!pattern) {
+    pattern = new RegExp(`\\b(?:${escapeRegExp(type)}|${escapeRegExp(pluralOfType(type))})\\b`, 'i');
+    typeMentionCache.set(type, pattern);
   }
-  return [...set];
+  return pattern;
+}
+
+/**
+ * Whether a commander unit actually *cares* about a creature type, rather
+ * than merely being one.
+ *
+ * Sharing a type is not a reason to pick a commander. Silas Renn is a Human
+ * whose text never mentions Humans; a pile of Humans in your list says
+ * nothing about him. Krenko counts Goblins, Lathril taps Elves, Edgar Markov
+ * triggers on Vampire spells, The First Sliver gives Sliver spells cascade —
+ * in every real kindred commander the type appears in the rules text, which
+ * is the difference this checks.
+ *
+ * Deliberately not also requiring the commander to *be* that type: Ghoulcaller
+ * Gisa is a Human Wizard and one of the best Zombie commanders in the format.
+ */
+function caresAboutCreatureType(candidateText: string, type: string): boolean {
+  return typeMentionPattern(type).test(candidateText);
 }
 
 function unitKeywords(unit: CommanderUnit): string[] {
@@ -344,7 +387,7 @@ function unitOracleText(unit: CommanderUnit): string {
 
 // Require at least this many *citable* cards — i.e. after narrowing to this
 // specific commander's own colour identity, not the whole list's global
-// count — for a theme/tribe/keyword to count as a real signal. Checking the
+// count — for a theme/kindred/keyword to count as a real signal. Checking the
 // narrowed count rather than the global one matters: a theme can show up
 // twice in the list overall but zero times among cards this commander could
 // actually run, which isn't a reason to suggest it. Below this threshold, a
@@ -356,7 +399,7 @@ const MIN_SIGNAL_COUNT = 3;
 /**
  * Scores each candidate commander against the collection profile.
  * A candidate needs a non-zero color-identity overlap with the uploaded
- * cards AND at least one tribal, keyword, or thematic signal to be
+ * cards AND at least one kindred, keyword, or thematic signal to be
  * suggested — this keeps the list from filling up with technically-legal
  * but meaningless matches.
  *
@@ -377,6 +420,15 @@ export function scoreCommanders(
 ): CommanderSuggestion[] {
   const suggestions: CommanderSuggestion[] = [];
 
+  // Narrowed once, ahead of the loop. Every candidate is tested against this
+  // list, and the pool runs to thousands of units on a real database, so
+  // types that could never clear the threshold are dropped up front. The
+  // global count is an upper bound on the identity-narrowed count, which
+  // makes this safe to pre-filter on.
+  const kindredCandidateTypes = Object.keys(profile.creatureTypeCards).filter(
+    (type) => profile.creatureTypeCards[type].length >= MIN_SIGNAL_COUNT
+  );
+
   for (const unit of units) {
     const identitySet = unitColorIdentity(unit);
     const fitsIdentity = ({ row }: OwnedCard) =>
@@ -396,13 +448,20 @@ export function scoreCommanders(
     }
     if (includedCardCount === 0) continue;
 
-    const tribeSupport: TribeSupport[] = unitCreatureTypes(unit)
+    const candidateText = unitOracleText(unit);
+
+    // Kindred is gated on the commander's own text mentioning the type, not
+    // on it merely having that type on its type line. See
+    // caresAboutCreatureType — being a Human is not a reason to helm a deck
+    // full of them.
+    const kindredSupport: KindredSupport[] = kindredCandidateTypes
+      .filter((type) => caresAboutCreatureType(candidateText, type))
       .map((type) => ({
         type,
         cards: (profile.creatureTypeCards[type] ?? []).filter(fitsIdentity).map(toSupportingCard),
       }))
-      .filter((t) => t.cards.length >= MIN_SIGNAL_COUNT);
-    const matchedCreatureTypes = tribeSupport.map((t) => t.type);
+      .filter((k) => k.cards.length >= MIN_SIGNAL_COUNT);
+    const matchedCreatureTypes = kindredSupport.map((k) => k.type);
 
     const keywordSupport: KeywordSupport[] = unitKeywords(unit)
       .map((keyword) => ({
@@ -412,7 +471,6 @@ export function scoreCommanders(
       .filter((k) => k.cards.length >= MIN_SIGNAL_COUNT);
     const matchedKeywords = keywordSupport.map((k) => k.keyword);
 
-    const candidateText = unitOracleText(unit);
     const matchedThemeEntries = THEMES.filter((def) => matchesTheme(def, candidateText))
       .map((def) => ({
         def,
@@ -478,7 +536,7 @@ export function scoreCommanders(
     const pool = Math.max(includedDistinctCount, 1);
     const density = (supporting: number) => supporting / pool;
     const score =
-      tribeSupport.reduce((sum, t) => sum + density(t.cards.length), 0) * 15 +
+      kindredSupport.reduce((sum, t) => sum + density(t.cards.length), 0) * 15 +
       matchedThemeEntries.reduce((sum, t) => sum + density(t.cards.length), 0) * 10 +
       keywordSupport.reduce((sum, k) => sum + density(k.cards.length), 0) * 8 +
       archetypeEntries.reduce((sum, a) => sum + density(a.cards.length), 0) * 20;
@@ -491,7 +549,7 @@ export function scoreCommanders(
       matchedKeywords,
       includedCardCount,
       themeSupport,
-      tribeSupport,
+      kindredSupport,
       keywordSupport,
       gameChangerCards,
     });

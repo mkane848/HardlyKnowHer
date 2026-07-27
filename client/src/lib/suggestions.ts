@@ -1,7 +1,7 @@
-import type { CommanderSuggestionDTO, KeywordSupportDTO, ThemeSupportDTO, TribeSupportDTO } from '../types';
+import type { CommanderSuggestionDTO, KeywordSupportDTO, ThemeSupportDTO, KindredSupportDTO } from '../types';
 
 /**
- * A theme or tribe can be "matched" against the collection as a whole, but
+ * A theme or kindred type can be "matched" against the collection as a whole, but
  * once support cards are filtered down to ones that actually fit this
  * specific commander's colour identity, none may be left — e.g. the list has
  * two Goblins, but they're red and this commander is mono-blue. That isn't a
@@ -16,20 +16,20 @@ export function visibleThemeSupport(suggestion: CommanderSuggestionDTO): ThemeSu
   return suggestion.themeSupport.filter((theme) => theme.cards.length > 0);
 }
 
-export function visibleTribeSupport(suggestion: CommanderSuggestionDTO): TribeSupportDTO[] {
-  return suggestion.tribeSupport.filter((tribe) => tribe.cards.length > 0);
+export function visibleKindredSupport(suggestion: CommanderSuggestionDTO): KindredSupportDTO[] {
+  return suggestion.kindredSupport.filter((kindred) => kindred.cards.length > 0);
 }
 
 export function visibleThemeLabels(suggestion: CommanderSuggestionDTO): string[] {
   return visibleThemeSupport(suggestion).map((theme) => theme.label);
 }
 
-export function visibleTribeTypes(suggestion: CommanderSuggestionDTO): string[] {
-  return visibleTribeSupport(suggestion).map((tribe) => tribe.type);
+export function visibleKindredTypes(suggestion: CommanderSuggestionDTO): string[] {
+  return visibleKindredSupport(suggestion).map((kindred) => kindred.type);
 }
 
 // Keywords have the same "matched globally, empty once filtered to this
-// commander's colour identity" problem as themes and tribes above — there's
+// commander's colour identity" problem as themes and kindred above — there's
 // no equivalent on main, since its synergy scoring dropped keyword support.
 export function visibleKeywordSupport(suggestion: CommanderSuggestionDTO): KeywordSupportDTO[] {
   return suggestion.keywordSupport.filter((keyword) => keyword.cards.length > 0);
