@@ -9,6 +9,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-07-28
+
 ### Fixed
 
 - Double-faced cards whose *back* is a legendary creature are no longer
