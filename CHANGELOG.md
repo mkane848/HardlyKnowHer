@@ -27,6 +27,19 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ### Changed
 
+- Scoring now rewards **depth of synergy**, not just how many themes a
+  commander matches. Previously every signal contributed the same share of
+  a commander's castable pool, so a wide spread of shallow matches could
+  out-score one deep, specific synergy — the opposite of what actually makes
+  a commander a good fit. Two changes: a signal citing 5 or more distinct
+  cards now earns a flat bonus per card beyond that floor, which (unlike the
+  existing density term) isn't diluted by how large the rest of the list is;
+  and each additional signal past a commander's strongest is discounted, so
+  piling up weak matches no longer out-accumulates real focus. Also, when a
+  named archetype (e.g. Aristocrats) fires, its component themes (Sacrifice,
+  Death Triggers, …) still show in "Why this commander?" but no longer add
+  their own score on top of the archetype's — they're the same cards under
+  a second label, and were being paid for twice.
 - Suggestions show their **raw score** instead of an "X% match". The
   percentage was relative to whatever was on screen and read as a confidence
   it never measured; while the scoring model is being tuned, the actual

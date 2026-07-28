@@ -413,6 +413,35 @@ function unitOracleText(unit: CommanderUnit): string {
 // ranked on something the user can't verify.
 const MIN_SIGNAL_COUNT = 3;
 
+// A second, higher bar: a signal citing this many distinct cards is not just
+// "real" (MIN_SIGNAL_COUNT) but *deep* enough to earn the bonus below. These
+// are deliberately different numbers — 3 decides whether a signal is shown
+// and counted at all; 5 decides whether it's strong enough to carry a
+// commander on its own, per the user's own bar ("a subset of cards, I'd say
+// at least 5, have an incredibly strong synergy").
+const DEEP_SIGNAL_COUNT = 5;
+
+// How much score each card beyond DEEP_SIGNAL_COUNT adds, flat — not scaled
+// by density. This is the point of it: density means a deep signal on a
+// 300-card list is worth almost nothing (8 supporting cards / 300 ≈
+// nothing), even though 8 cards is a real deck's worth of a theme. The bonus
+// is measured in the same cards the user is naming, not diluted by how big
+// the rest of the list is.
+const DEPTH_BONUS_PER_CARD = 1;
+
+// Each additional signal (beyond the strongest one) is discounted by this
+// factor, so a commander can no longer out-score a focused one just by
+// piling up shallow matches — a wide, generic spread of themes is exactly
+// what should lose to one deep, specific synergy. An infinite run of
+// equal-value signals converges to 1 / (1 - factor) times a single signal's
+// value, so 0.7 caps pure breadth at ~3.3x the best individual match.
+const DIMINISHING_FACTOR = 0.7;
+
+const KINDRED_WEIGHT = 15;
+const THEME_WEIGHT = 10;
+const KEYWORD_WEIGHT = 8;
+const ARCHETYPE_WEIGHT = 20;
+
 /**
  * Scores each candidate commander against the collection profile.
  * A candidate needs a non-zero color-identity overlap with the uploaded
@@ -522,6 +551,17 @@ export function scoreCommanders(
       ),
     }));
 
+    // Once an archetype fires, its component themes are the same cards under
+    // a second label — e.g. Aristocrats' card list is just the union of the
+    // Sacrifice and Death Triggers lists. Scoring both would pay twice for
+    // one synergy. The components still appear in the "why" panel below
+    // (themeSupport is built from the unfiltered matchedThemeEntries); this
+    // only removes them from the score.
+    const consumedThemeKeys = new Set(
+      matchedArchetypes.flatMap((arch) => arch.componentKeys.filter((k) => matchedThemeKeys.has(k)))
+    );
+    const scoredThemeEntries = matchedThemeEntries.filter((t) => !consumedThemeKeys.has(t.def.key));
+
     const themeSupport: ThemeSupport[] = [
       ...archetypeEntries.map(({ arch, cards }) => ({
         key: arch.key,
@@ -552,11 +592,38 @@ export function scoreCommanders(
     // fixed lead over any focused commander before synergy was looked at.
     const pool = Math.max(includedDistinctCount, 1);
     const density = (supporting: number) => supporting / pool;
-    const score =
-      kindredSupport.reduce((sum, t) => sum + density(t.cards.length), 0) * 15 +
-      matchedThemeEntries.reduce((sum, t) => sum + density(t.cards.length), 0) * 10 +
-      keywordSupport.reduce((sum, k) => sum + density(k.cards.length), 0) * 8 +
-      archetypeEntries.reduce((sum, a) => sum + density(a.cards.length), 0) * 20;
+
+    // One list of every signal this commander earned, each carrying both its
+    // density-weighted value (for breadth, below) and its raw card count
+    // (for depth, below) — the two terms deliberately read different numbers
+    // off the same signal rather than sharing one.
+    const signals = [
+      ...kindredSupport.map((t) => ({ cardCount: t.cards.length, rawScore: density(t.cards.length) * KINDRED_WEIGHT })),
+      ...scoredThemeEntries.map((t) => ({ cardCount: t.cards.length, rawScore: density(t.cards.length) * THEME_WEIGHT })),
+      ...keywordSupport.map((k) => ({ cardCount: k.cards.length, rawScore: density(k.cards.length) * KEYWORD_WEIGHT })),
+      ...archetypeEntries.map((a) => ({ cardCount: a.cards.length, rawScore: density(a.cards.length) * ARCHETYPE_WEIGHT })),
+    ];
+
+    // Breadth: every signal still contributes, but each one past the
+    // strongest is worth less than the last (DIMINISHING_FACTOR per rank).
+    // A commander can no longer out-score a focused one purely by matching
+    // more themes at low density each.
+    const breadthScore = signals
+      .map((s) => s.rawScore)
+      .sort((a, b) => b - a)
+      .reduce((sum, rawScore, rank) => sum + rawScore * DIMINISHING_FACTOR ** rank, 0);
+
+    // Depth: a signal citing DEEP_SIGNAL_COUNT or more distinct cards earns a
+    // flat bonus per card beyond that floor. Unlike density this is never
+    // diluted by the rest of the list, so a genuinely deep synergy — the
+    // user's own bar of "at least 5 cards" — can outweigh a commander that
+    // only spreads thin across many signals.
+    const depthScore = signals.reduce(
+      (sum, s) => sum + Math.max(0, s.cardCount - DEEP_SIGNAL_COUNT + 1) * DEPTH_BONUS_PER_CARD,
+      0
+    );
+
+    const score = breadthScore + depthScore;
 
     suggestions.push({
       cards: unit.cards,
