@@ -60,9 +60,9 @@ check('hasActiveFilters is false only when every facet is empty', () => {
   );
 });
 
-// --- colour filtering (subset-include, any-touch-exclude) --------------
+// --- color filtering (subset-include, any-touch-exclude) --------------
 
-check('colour include keeps subsets of the selected colours, plus colorless', () => {
+check('color include keeps subsets of the selected colors, plus colorless', () => {
   const golgari = makeSuggestion({ colorIdentity: ['B', 'G'] });
   const monoBlack = makeSuggestion({ colorIdentity: ['B'] });
   const colorless = makeSuggestion({ colorIdentity: [] });
@@ -73,7 +73,7 @@ check('colour include keeps subsets of the selected colours, plus colorless', ()
   assert.deepStrictEqual(kept, [golgari, monoBlack, colorless]);
 });
 
-check('colour exclude drops anything touching an excluded colour', () => {
+check('color exclude drops anything touching an excluded color', () => {
   const golgari = makeSuggestion({ colorIdentity: ['B', 'G'] });
   const mardu = makeSuggestion({ colorIdentity: ['W', 'B', 'R'] });
   const simic = makeSuggestion({ colorIdentity: ['U', 'G'] });
@@ -83,9 +83,9 @@ check('colour exclude drops anything touching an excluded colour', () => {
   assert.deepStrictEqual(kept, [simic]);
 });
 
-// --- colour category (colorless / multicolor), same include/exclude cycle -
+// --- color category (colorless / multicolor), same include/exclude cycle -
 
-check('colorCategory include=colorless keeps only zero-colour identities', () => {
+check('colorCategory include=colorless keeps only zero-color identities', () => {
   const colorless = makeSuggestion({ colorIdentity: [] });
   const mono = makeSuggestion({ colorIdentity: ['B'] });
   const multi = makeSuggestion({ colorIdentity: ['B', 'G'] });
@@ -94,7 +94,7 @@ check('colorCategory include=colorless keeps only zero-colour identities', () =>
   assert.deepStrictEqual(applyFilters([colorless, mono, multi], filters), [colorless]);
 });
 
-check('colorCategory include=multicolor keeps only 2+ colour identities', () => {
+check('colorCategory include=multicolor keeps only 2+ color identities', () => {
   const colorless = makeSuggestion({ colorIdentity: [] });
   const mono = makeSuggestion({ colorIdentity: ['B'] });
   const multi = makeSuggestion({ colorIdentity: ['B', 'G'] });
@@ -103,7 +103,7 @@ check('colorCategory include=multicolor keeps only 2+ colour identities', () => 
   assert.deepStrictEqual(applyFilters([colorless, mono, multi], filters), [multi]);
 });
 
-check('colorCategory exclude=colorless drops zero-colour identities only', () => {
+check('colorCategory exclude=colorless drops zero-color identities only', () => {
   const colorless = makeSuggestion({ colorIdentity: [] });
   const mono = makeSuggestion({ colorIdentity: ['B'] });
   const multi = makeSuggestion({ colorIdentity: ['B', 'G'] });

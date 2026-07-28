@@ -10,8 +10,8 @@ interface Props {
 }
 
 /**
- * One mana symbol: the coloured disc from CSS, the glyph from inlined path
- * data. Matches how the printed symbols look — coloured circle, dark glyph,
+ * One mana symbol: the colored disc from CSS, the glyph from inlined path
+ * data. Matches how the printed symbols look — colored circle, dark glyph,
  * subtle drop shadow — without pulling in a webfont for six icons.
  */
 export function ManaSymbol({ color, decorative, className }: Props) {

@@ -380,7 +380,7 @@ body {
   opacity: 0.8;
 }
 
-/* Include/exclude read as colour, not just a filled-in state, since both
+/* Include/exclude read as color, not just a filled-in state, since both
    are "active" — green ring to require a value, red ring to rule it out. */
 .toggle-pip-include {
   opacity: 1;
@@ -528,6 +528,70 @@ body {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+/* Numbered page buttons. Wraps rather than overflowing: with a long result
+   set the ellipsis keeps this short, but a narrow screen can still run out
+   of room for first + window + last. */
+.page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.page-number {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  /* min-width so single- and double-digit pages don't jitter the row width
+     as you move through them. */
+  min-width: 2rem;
+  padding: 0.35rem 0.4rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.page-number:hover {
+  border-color: var(--ink-border);
+  color: var(--text-primary);
+}
+
+.page-number.is-current {
+  color: var(--brass-bright);
+  border-color: var(--brass);
+  font-weight: 600;
+}
+
+.page-gap {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 0 0.1rem;
+}
+
+/* Reverses whichever sort mode is selected; sits beside that control. */
+.sort-direction {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.sort-direction:hover {
+  border-color: var(--brass);
 }
 
 .commander-card {
@@ -701,8 +765,8 @@ body {
   gap: 0.3rem;
 }
 
-/* Mana pip: coloured disc here, glyph from inlined SVG (see ManaSymbol).
-   Mirrors how printed symbols look — coloured circle, dark glyph, soft
+/* Mana pip: colored disc here, glyph from inlined SVG (see ManaSymbol).
+   Mirrors how printed symbols look — colored circle, dark glyph, soft
    shadow. */
 .pip {
   --pip-bg: var(--pip-c);
@@ -743,7 +807,7 @@ body {
   --pip-bg: var(--pip-c);
 }
 
-/* The dark colours need a light glyph to stay legible. */
+/* The dark colors need a light glyph to stay legible. */
 .pip-b svg,
 .pip-u svg,
 .pip-r svg,
@@ -1270,6 +1334,24 @@ summary.explain-group-title::after {
 .card-image-link {
   font-size: 0.78rem;
   color: var(--brass-bright);
+}
+
+/* Only rendered for a genuine two-sided card, so it never sits inert next to
+   a single-faced one. */
+.card-image-flip {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.card-image-flip:hover {
+  border-color: var(--brass);
 }
 
 .dialog-art {

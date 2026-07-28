@@ -30,7 +30,13 @@ function cardCount(cards: SupportingCardDTO[]): number {
  */
 function SupportingCardName({ card }: { card: SupportingCardDTO }) {
   const nameButton = (
-    <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
+    <CardImageDialog
+      name={card.name}
+      imageUri={card.imageUri}
+      backImageUri={card.backImageUri}
+      backName={card.backName}
+      scryfallUri={card.scryfallUri}
+    >
       <button type="button" className="support-name" aria-label={`Show the card ${card.name}`}>
         {card.name}
       </button>
@@ -79,20 +85,22 @@ function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
 }
 
 /**
- * How strongly this suggestion scored relative to the best match in the
- * current (filtered) results — not an absolute number, which the scoring
- * formula gives no natural ceiling for and so wouldn't mean anything on its
- * own. Shown as a badge; hovering (or tapping, for touch) reveals a
- * breakdown of what drove it.
+ * The raw score this suggestion was ranked by, shown as-is.
+ *
+ * Deliberately not normalised into a percentage or a confidence label: while
+ * the scoring model is still being tuned, the actual number is the useful
+ * thing to see — a percentage of the top result hides whether the whole
+ * field scored 3 or 300, and reads as a confidence it was never measuring.
+ * The explanation below it stays, since *why* a number came out that way is
+ * exactly what a raw figure doesn't tell you.
  *
  * The tooltip stays in the DOM and is shown/hidden with CSS (:hover,
  * :focus-within) so desktop hover needs no JS at all — `open` only exists to
  * make tap-to-toggle work on touch devices, which have no hover state.
  */
-function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionDTO; maxScore: number }) {
+function ScoreBadge({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
-  const percent = maxScore > 0 ? Math.round((suggestion.score / maxScore) * 100) : 100;
 
   // Each entry names its own kind and carries its own plural, so they read
   // correctly joined together without a trailing noun to agree with.
@@ -117,19 +125,18 @@ function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionD
         onClick={() => setOpen((o) => !o)}
         onBlur={() => setOpen(false)}
       >
-        {percent}% match
+        score {suggestion.score}
       </button>
       {/* The card count is the pool each signal is measured against, not
-          credit in its own right — colours decide what is eligible and score
+          credit in its own right — colors decide what is eligible and score
           nothing, so the wording must not imply that playing more of your
           list is itself what earned the score. */}
       <span role="tooltip" id={tooltipId} className="match-tooltip">
-        {percent < 100
-          ? `${percent}% as strong a match as the top suggestion here`
-          : 'The strongest match in your current results'}
-        {signals.length > 0 ? `: ${signals.join(', ')}` : ''}, weighed against the {suggestion.includedCardCount} card
-        {suggestion.includedCardCount === 1 ? '' : 's'} it can play from your list. Colours decide which cards count,
-        never how good the match is.
+        Ranked on {suggestion.score}
+        {signals.length > 0 ? `, from ${signals.join(', ')}` : ''}, weighed against the{' '}
+        {suggestion.includedCardCount} card{suggestion.includedCardCount === 1 ? '' : 's'} it can play from your list.
+        Each signal counts for the share of that pool backing it. Colors decide which cards count, never how good the
+        match is.
       </span>
     </span>
   );
@@ -139,7 +146,13 @@ function MatchBadge({ suggestion, maxScore }: { suggestion: CommanderSuggestionD
 function CommanderArt({ card }: { card: CommanderCardDTO }) {
   if (!card.imageUri) return null;
   return (
-    <CardImageDialog name={card.name} imageUri={card.imageUri} scryfallUri={card.scryfallUri}>
+    <CardImageDialog
+      name={card.name}
+      imageUri={card.imageUri}
+      backImageUri={card.backImageUri}
+      backName={card.backName}
+      scryfallUri={card.scryfallUri}
+    >
       <button type="button" className="commander-art-trigger" aria-label={`Show the full card for ${card.name}`}>
         <img className="commander-image" src={card.imageUri} alt={card.name} loading="lazy" />
       </button>
@@ -212,26 +225,17 @@ function CommanderFace({
   );
 }
 
-export function CommanderCard({
-  suggestion,
-  maxScore,
-}: {
-  suggestion: CommanderSuggestionDTO;
-  /** The highest score among the currently-visible suggestions, for the
-   * match badge's relative percentage. */
-  maxScore: number;
-}) {
+export function CommanderCard({ suggestion }: { suggestion: CommanderSuggestionDTO }) {
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const dismiss = useAppStore((s) => s.dismiss);
 
   const displayName = suggestion.cards.map((c) => c.name).join(' + ');
-  const isGameChanger = suggestion.cards.some((c) => c.isGameChanger);
   const isPair = suggestion.cards.length > 1;
 
   // Themes/kindred/keywords the collection profile matched globally can still
   // end up with zero cards once narrowed to ones that fit this commander's
-  // colour identity — that's not a real reason to suggest it, so it's
+  // color identity — that's not a real reason to suggest it, so it's
   // filtered out here rather than shown as an empty group.
   const kindredSupport = visibleKindredSupport(suggestion);
   const themeSupport = visibleThemeSupport(suggestion);
@@ -298,9 +302,16 @@ export function CommanderCard({
         ))}
 
         <div className="badge-row">
-          <MatchBadge suggestion={suggestion} maxScore={maxScore} />
-          <span className="badge badge-bracket">{suggestion.bracket.range}</span>
-          {isGameChanger && <span className="badge badge-gc">Game Changer</span>}
+          <ScoreBadge suggestion={suggestion} />
+          {/* Bracket badge and its note are hidden while the estimate is
+              being reworked — `bracket` is still on the DTO and still drives
+              the Game Changer count below, so restoring this is a one-line
+              change rather than a re-plumb. */}
+          {suggestion.gameChangerCount > 0 && (
+            <span className="badge badge-gc">
+              {suggestion.gameChangerCount} Game Changer{suggestion.gameChangerCount === 1 ? '' : 's'}
+            </span>
+          )}
         </div>
 
         <p className="commander-meta">
@@ -322,8 +333,6 @@ export function CommanderCard({
             <span className="commander-tags-label">Keywords</span> {keywordLabels.join(', ')}
           </p>
         )}
-
-        <p className="commander-bracket-note">{suggestion.bracket.note}</p>
 
         {hasReasons && (
           <button
@@ -397,7 +406,7 @@ export function CommanderCard({
 
             {suggestion.gameChangerCards.length > 0 && (
               <section className="explain-section">
-                <h4 className="explain-heading">Driving the Bracket estimate</h4>
+                <h4 className="explain-heading">Game Changers</h4>
                 {/* Collapsed like the signal groups above, so no one section
                     is left stretching the panel on its own. */}
                 <details className="explain-group">
@@ -406,7 +415,7 @@ export function CommanderCard({
                     <span className="explain-count">{cardCount(suggestion.gameChangerCards)} in your list</span>
                   </summary>
                   <p className="explain-group-desc">
-                    These cards are on Wizards' Game Changers list, which is what this estimate counts.
+                    These cards are on Wizards' official Game Changers list.
                   </p>
                   <SupportingCardList cards={suggestion.gameChangerCards} />
                 </details>

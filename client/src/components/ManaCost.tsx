@@ -9,7 +9,7 @@ function parseCost(cost: string): string[] {
 /**
  * Renders a mana cost as symbols.
  *
- * Only the five colours and colorless have inlined glyphs, so anything else —
+ * Only the five colors and colorless have inlined glyphs, so anything else —
  * generic amounts, {X}, {T}, hybrids — falls back to a neutral disc with the
  * symbol's text in it. That covers every cost legibly without inlining the
  * ~300 glyphs the full set would need.

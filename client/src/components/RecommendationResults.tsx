@@ -10,8 +10,9 @@ import { useAppStore } from '../store/useAppStore';
 import { usePreferencesStore } from '../store/usePreferencesStore';
 import { useRecommendations } from '../api/queries';
 import { applyFilters, availableFilterValues, EMPTY_FILTERS, hasActiveFilters } from '../lib/filters';
-import { sortSuggestions, type SortMode } from '../lib/sort';
+import { sortSuggestions, type SortDirection, type SortMode } from '../lib/sort';
 import { CommanderCard } from './CommanderCard';
+import { Pagination } from './Pagination';
 import { ResultFilters } from './ResultFilters';
 import type { CommanderSuggestionDTO } from '../types';
 
@@ -73,6 +74,7 @@ export function RecommendationResults() {
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sortMode, setSortMode] = useState<SortMode>('relevance');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const suggestionsPerPage = usePreferencesStore((s) => s.suggestionsPerPage);
   const setSuggestionsPerPage = usePreferencesStore((s) => s.setSuggestionsPerPage);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: suggestionsPerPage });
@@ -95,11 +97,11 @@ export function RecommendationResults() {
     [suggestions, dismissed]
   );
   const filtered = useMemo(() => applyFilters(kept, filters), [kept, filters]);
-  const sorted = useMemo(() => sortSuggestions(filtered, sortMode), [filtered, sortMode]);
+  const sorted = useMemo(
+    () => sortSuggestions(filtered, sortMode, sortDirection),
+    [filtered, sortMode, sortDirection]
+  );
   const { brackets, themes, hasColorless, hasMulticolor } = useMemo(() => availableFilterValues(kept), [kept]);
-  // The match badge's percentage is relative to the best score currently on
-  // screen, not sort order — so it stays meaningful under either sort mode.
-  const maxScore = useMemo(() => Math.max(0, ...filtered.map((s) => s.score)), [filtered]);
 
   // TanStack Table is used headlessly here, purely for the pagination state
   // machine — page bounds, and resetting to page 1 when filtering or sorting
@@ -183,6 +185,8 @@ export function RecommendationResults() {
             hasMulticolor={hasMulticolor}
             sortMode={sortMode}
             onSortModeChange={setSortMode}
+            sortDirection={sortDirection}
+            onSortDirectionChange={setSortDirection}
             pageSize={suggestionsPerPage}
             onPageSizeChange={setSuggestionsPerPage}
             shown={filtered.length}
@@ -206,33 +210,16 @@ export function RecommendationResults() {
             <>
               <div className="suggestion-grid">
                 {rows.map((row) => (
-                  <CommanderCard key={row.original.unitId} suggestion={row.original} maxScore={maxScore} />
+                  <CommanderCard key={row.original.unitId} suggestion={row.original} />
                 ))}
               </div>
 
-              {pageCount > 1 && (
-                <nav className="pagination" aria-label="Suggestion pages">
-                  <button
-                    type="button"
-                    className="page-button"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                  >
-                    ← Previous
-                  </button>
-                  <span className="page-status" aria-live="polite">
-                    Page {pageIndex + 1} of {pageCount}
-                  </span>
-                  <button
-                    type="button"
-                    className="page-button"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                  >
-                    Next →
-                  </button>
-                </nav>
-              )}
+              <Pagination
+                pageIndex={pageIndex}
+                pageCount={pageCount}
+                onPageChange={(index) => table.setPageIndex(index)}
+                label="Suggestion pages"
+              />
             </>
           )}
         </>

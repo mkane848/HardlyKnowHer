@@ -10,7 +10,7 @@ import {
   type FilterSelection,
   type SuggestionFilters,
 } from '../lib/filters';
-import { SORT_MODE_LABELS, type SortMode } from '../lib/sort';
+import { SORT_MODE_LABELS, type SortDirection, type SortMode } from '../lib/sort';
 import { SUGGESTIONS_PAGE_SIZE_OPTIONS } from '../store/usePreferencesStore';
 
 interface Props {
@@ -22,6 +22,8 @@ interface Props {
   hasMulticolor: boolean;
   sortMode: SortMode;
   onSortModeChange: (mode: SortMode) => void;
+  sortDirection: SortDirection;
+  onSortDirectionChange: (direction: SortDirection) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   shown: number;
@@ -29,6 +31,14 @@ interface Props {
 }
 
 const MODE_ICON: Record<FilterMode, string> = { include: '+', exclude: '−' };
+
+/**
+ * Bracket filtering is hidden while the Bracket estimate itself is hidden on
+ * each card (see CommanderCard's badge row) — filtering by a number the
+ * results no longer display would be filtering blind. Everything behind it
+ * still works; flip this back to `true` when the estimate returns.
+ */
+const SHOW_BRACKET_FILTER = false;
 
 /** Each facet chip cycles off → include → exclude → off on click, so a
  * single control covers "must have" and "must not have" without doubling
@@ -69,15 +79,15 @@ function nextModeDescription(current: FilterMode | null): string {
 }
 
 /**
- * Colours read differently from every other facet, so they get their own
+ * Colors read differently from every other facet, so they get their own
  * wording. Including Bracket 3 or a theme *requires* it; including White does
- * not require white, it permits it — a commander shows when its whole colour
+ * not require white, it permits it — a commander shows when its whole color
  * identity fits inside what you have allowed. Picking White and Black is the
  * Orzhov question ("what could I build here?"), which is why mono-black still
  * appears, and why calling this "require" was actively misleading.
  */
 function nextColorModeDescription(current: FilterMode | null): string {
-  if (current === null) return 'not filtered — click to allow this colour';
+  if (current === null) return 'not filtered — click to allow this color';
   if (current === 'include') return 'allowed — click to exclude it instead';
   return 'excluded — click to clear';
 }
@@ -91,6 +101,8 @@ export function ResultFilters({
   hasMulticolor,
   sortMode,
   onSortModeChange,
+  sortDirection,
+  onSortDirectionChange,
   pageSize,
   onPageSizeChange,
   shown,
@@ -142,10 +154,10 @@ export function ResultFilters({
             />
           )}
         </div>
-        <span className="filter-hint">click to allow a colour, again to exclude — results fit within the allowed colours</span>
+        <span className="filter-hint">click to allow a color, again to exclude — results fit within the allowed colors</span>
       </div>
 
-      {availableBrackets.length > 1 && (
+      {SHOW_BRACKET_FILTER && availableBrackets.length > 1 && (
         <div className="filter-row">
           <span className="filter-label" id="filter-bracket-label">
             Bracket
@@ -204,6 +216,16 @@ export function ResultFilters({
             ))}
           </select>
         </label>
+
+        <button
+          type="button"
+          className="sort-direction"
+          onClick={() => onSortDirectionChange(sortDirection === 'asc' ? 'desc' : 'asc')}
+          aria-label={`Sort ${sortDirection === 'asc' ? 'ascending' : 'descending'} — click to reverse`}
+          title={`Sort ${sortDirection === 'asc' ? 'ascending' : 'descending'} — click to reverse`}
+        >
+          <span aria-hidden="true">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+        </button>
 
         {/* Remembered across visits (see usePreferencesStore) — a page size
             picked once is a standing preference, not a one-off for this

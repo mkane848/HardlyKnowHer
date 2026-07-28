@@ -11,6 +11,8 @@ export function makeSupportingCard(overrides: Partial<SupportingCardDTO> = {}): 
     isGameChanger: false,
     manaValue: null,
     imageUri: null,
+    backImageUri: null,
+    backName: null,
     scryfallUri: null,
     ...overrides,
   };
@@ -23,6 +25,8 @@ export function makeCommanderCard(overrides: Partial<CommanderCardDTO> = {}): Co
     oracleId: name,
     name,
     imageUri: null,
+    backImageUri: null,
+    backName: null,
     colorIdentity: [],
     typeLine: null,
     oracleText: null,

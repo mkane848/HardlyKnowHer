@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { frontFaceCharacteristics, isCommanderEligible } from '../src/services/eligibility';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
@@ -63,7 +64,11 @@ db.exec(`
     -- solo/is_commander_eligible candidate — it only becomes a commander
     -- paired with a "choose a Background" card.
     is_background INTEGER DEFAULT 0,
-    image_uri TEXT
+    image_uri TEXT,
+    -- Second face of a true two-sided card (transform/modal_dfc), so the art
+    -- preview can offer a flip. NULL for everything else.
+    back_image_uri TEXT,
+    back_name TEXT
   );
   CREATE INDEX idx_cards_name_lower ON cards(name_lower);
   CREATE INDEX idx_cards_commander_eligible ON cards(is_commander_eligible);
@@ -137,13 +142,15 @@ const insert = db.prepare(`
     colors, color_identity, keywords, creature_types,
     power, toughness, scryfall_uri,
     legality_commander, game_changer, is_legendary, is_commander_eligible,
-    partner_ability, partner_target, is_background, image_uri
+    partner_ability, partner_target, is_background, image_uri,
+    back_image_uri, back_name
   ) VALUES (
     @oracle_id, @name, @name_lower, @mana_cost, @cmc, @type_line, @oracle_text,
     @colors, @color_identity, @keywords, @creature_types,
     @power, @toughness, @scryfall_uri,
     @legality_commander, @game_changer, @is_legendary, @is_commander_eligible,
-    @partner_ability, @partner_target, @is_background, @image_uri
+    @partner_ability, @partner_target, @is_background, @image_uri,
+    @back_image_uri, @back_name
   )
 `);
 
@@ -174,20 +181,24 @@ const insertMany = db.transaction((rows: any[]) => {
         .join('\n');
     const imageUri: string | null =
       card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal ?? null;
+    // Only a genuinely two-sided card has a second image to flip to. Split,
+    // adventure and flip cards all print on one physical face, so their
+    // "second face" is the same picture.
+    const backImageUri: string | null = DFC_LAYOUTS.has(card.layout)
+      ? card.card_faces?.[1]?.image_uris?.normal ?? null
+      : null;
+    const backName: string | null = DFC_LAYOUTS.has(card.layout) ? card.card_faces?.[1]?.name ?? null : null;
 
-    const isLegendary = typeLine.includes('Legendary') ? 1 : 0;
-    // 903.3: a commander must be a creature, a Vehicle, or a Spacecraft (with
-    // a power/toughness box) — not only a creature. An unanimated Vehicle's
-    // type line is just "Artifact — Vehicle", no "Creature" in sight, so
-    // checking isCreature alone silently excluded every legal Vehicle and
-    // Spacecraft commander.
-    const isEligibleType =
-      typeLine.includes('Creature') || typeLine.includes('Vehicle') || typeLine.includes('Spacecraft');
-    const mentionsCommander = /can be your commander/i.test(oracleText);
-    const isCommanderEligible = (isLegendary === 1 && isEligibleType) || mentionsCommander ? 1 : 0;
+    // Eligibility reads the front face only — see services/eligibility.ts.
+    // Westvale Abbey's joined type_line ("Land // Legendary Creature —
+    // Demon") satisfied a naive Legendary+Creature check off its *back*,
+    // making a non-legendary land look like a legal commander.
+    const front = frontFaceCharacteristics(card);
+    const isLegendary = front.typeLine.includes('Legendary') ? 1 : 0;
+    const commanderEligible = isCommanderEligible(card) ? 1 : 0;
 
     const { ability: partnerAbility, target: partnerTarget } = detectPartnerAbility(oracleText);
-    const isBackground = typeLine.includes('Background') ? 1 : 0;
+    const isBackground = front.typeLine.includes('Background') ? 1 : 0;
 
     insert.run({
       oracle_id: card.oracle_id,
@@ -200,7 +211,10 @@ const insertMany = db.transaction((rows: any[]) => {
       colors: JSON.stringify(card.colors ?? card.card_faces?.[0]?.colors ?? []),
       color_identity: JSON.stringify(card.color_identity ?? []),
       keywords: JSON.stringify(card.keywords ?? []),
-      creature_types: JSON.stringify(parseCreatureTypes(typeLine)),
+      // Front face too: a card in your library or hand is its front face, so
+      // Delver of Secrets counts toward Wizards, not toward the Insect its
+      // battlefield-only back side becomes.
+      creature_types: JSON.stringify(parseCreatureTypes(front.typeLine)),
       // Kept so the card-detail dialog can show what a printed card shows,
       // and link out to the real page rather than reimplementing it.
       power: card.power ?? card.card_faces?.[0]?.power ?? null,
@@ -209,11 +223,13 @@ const insertMany = db.transaction((rows: any[]) => {
       legality_commander: card.legalities?.commander ?? 'not_legal',
       game_changer: card.game_changer ? 1 : 0,
       is_legendary: isLegendary,
-      is_commander_eligible: isCommanderEligible,
+      is_commander_eligible: commanderEligible,
       partner_ability: partnerAbility,
       partner_target: partnerTarget,
       is_background: isBackground,
       image_uri: imageUri,
+      back_image_uri: backImageUri,
+      back_name: backName,
     });
     imported++;
 

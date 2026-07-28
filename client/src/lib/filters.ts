@@ -14,9 +14,9 @@ export interface SuggestionFilters {
   colors: FilterSelection;
   /**
    * A further, independent restriction by identity *size* rather than
-   * membership: colorless (identity is empty) or multicolor (2+ colours).
+   * membership: colorless (identity is empty) or multicolor (2+ colors).
    * Kept as its own facet rather than folded into `colors` — "must be a
-   * subset of {B, G}" and "must have 2+ colours" are different kinds of
+   * subset of {B, G}" and "must have 2+ colors" are different kinds of
    * question — but its values ('colorless' | 'multicolor') use the same
    * include/exclude cycle as every other facet, and render as chips inside
    * the same "Colors" filter row.
@@ -60,11 +60,11 @@ export function cycleSelection(selection: FilterSelection, value: string): Filte
 }
 
 /**
- * Colour filtering keeps subset semantics for "include": picking {B, G}
+ * Color filtering keeps subset semantics for "include": picking {B, G}
  * keeps everything playable in a Golgari deck — mono-black, mono-green,
- * Golgari, and colorless — rather than only things that touch both colours.
+ * Golgari, and colorless — rather than only things that touch both colors.
  * "Exclude" is the literal complement: identities that touch an excluded
- * colour at all are dropped, regardless of what else they contain.
+ * color at all are dropped, regardless of what else they contain.
  */
 function matchesColors(suggestion: CommanderSuggestionDTO, selection: FilterSelection): boolean {
   const { include, exclude } = selection;
