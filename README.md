@@ -203,9 +203,10 @@ isn't a real pattern, so it's dropped entirely rather than shown as a weak
 reason.
 
 **A commander has to actually care.** Sharing a property with your cards is
-never enough on its own. Being a Goblin doesn't make a commander a Goblin
-commander — Goblin Sharpshooter is a Goblin whose abilities care about
-creatures dying, not about Goblins, and its name is not evidence of anything.
+never enough on its own. Being a Frog Horror doesn't make a commander a Horror
+commander — Gitrog, Horror of Zhava's abilities are entirely about lands, and
+"Horror" reaches its rules text only through its own name, which is not
+evidence of anything.
 Having Trample doesn't make one a Trample payoff either; granting trample to
 your whole team, the way Craterhoof Behemoth does, is what counts. Every
 signal is read from two sides: which group your card *belongs to* comes from

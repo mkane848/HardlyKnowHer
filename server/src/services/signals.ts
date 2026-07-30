@@ -256,9 +256,36 @@ function wordPattern(word: string): RegExp {
   return pattern;
 }
 
+/**
+ * Whether the card sacrifices *itself*, as opposed to an indefinite object.
+ *
+ * Two spellings, because Scryfall changed theirs. Older text named the card
+ * ("Sacrifice Arid Mesa:"); current text says "Sacrifice this land:" /
+ * "Sacrifice this creature:". Both are read off the RAW text — the
+ * name-stripped copy renders the first form as a bare "Sacrifice :".
+ */
+function detectsSelfSacrifice(rawText: string, name: string): boolean {
+  if (/\bsacrifice this\b/i.test(rawText)) return true;
+  const short = name.split(',')[0].trim();
+  if (!short) return false;
+  return new RegExp(`sacrifice ${escapeRegExp(short)}\\b`, 'i').test(rawText);
+}
+
+/**
+ * Removes reminder text — the parenthetical restatement of a keyword.
+ *
+ * Reminder text explains a keyword the card already has; it is never an
+ * ability of its own. Leaving it in produced real false positives: Sliver
+ * Gravemother's Encore reminder text ends "They gain haste", which read as
+ * the card *granting* haste to your team, i.e. an active Haste payoff.
+ */
+function stripReminderText(text: string): string {
+  return text.replace(/\([^)]*\)/g, ' ');
+}
+
 export function buildCardFacts(row: CardRow, knownTypes: string[]): CardFacts {
   const rawText = row.oracle_text ?? '';
-  const text = stripSelfReferences(rawText, row.name, row.back_name ?? null);
+  const text = stripReminderText(stripSelfReferences(rawText, row.name, row.back_name ?? null));
   const typeLine = row.type_line ?? '';
   return {
     name: row.name,
@@ -268,11 +295,7 @@ export function buildCardFacts(row: CardRow, knownTypes: string[]): CardFacts {
     creatureTypes: parseJsonArray(row.creature_types),
     keywords: parseJsonArray(row.keywords),
     producedTokenTypes: findProducedTokenTypes(text, knownTypes),
-    // Read off the RAW text on purpose: "Sacrifice Arid Mesa:" is only
-    // recognisable as self-sacrifice while the name is still there. After
-    // stripping it reads "Sacrifice :", which is why this fact is computed
-    // here rather than pattern-matched later.
-    sacrificesItself: new RegExp(`sacrifice ${escapeRegExp(row.name.split(',')[0].trim())}\\b`, 'i').test(rawText),
+    sacrificesItself: detectsSelfSacrifice(rawText, row.name),
     isLand: /\bLand\b/.test(typeLine),
     isCreature: /\bCreature\b/.test(typeLine),
     isEquipment: /\bEquipment\b/.test(typeLine),

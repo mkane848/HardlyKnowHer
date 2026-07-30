@@ -453,16 +453,27 @@ server/                Express + TS + better-sqlite3
   - **Changelings** are every creature type by rule, but Scryfall's type
     line says `Creature — Shapeshifter`, so no type-based test will ever
     see one as a Goblin. Accepted, not special-cased.
-- **Signal detection has never been run against real card data.** Network
-  egress to `api.scryfall.com` / `data.scryfall.io` was blocked in the
-  session that wrote `signals.ts`, so every rule is covered by unit tests
-  over hand-built rows and by oracle text quoted from memory. Text marked
-  `REPRESENTATIVE` in `test-signals.ts` (currently only Sliver Gravemother)
-  could not be verified against the real card at all and tests the *shape*
-  of a card rather than a specific one. First thing to do with a working
-  import: run real lists through it and check the archetypes that come
-  back, especially the regex-heavy ones (`landsMatter`, `selfMill`,
-  `voltron`).
+- **Never write oracle text from memory — copy it out of the database.**
+  Scryfall has switched much of its self-referential wording from the card's
+  name to "this creature" / "this land". Two rules were written against
+  recalled text and were wrong on real cards: Goblin Sharpshooter no longer
+  says "Goblin" anywhere (so it is not, as first claimed, an instance of the
+  name bug — Gitrog, Horror of Zhava is), and Arid Mesa reads "Sacrifice this
+  land", not "Sacrifice Arid Mesa", which silently broke self-sacrifice
+  detection and left it with no signals at all. Every string in
+  `test-signals.ts` is now copied verbatim from the imported database. Keep
+  it that way.
+- **Scoring produces large ties.** A real 34-card Goblin list returned 1,504
+  suggestions with ten commanders sharing a score of 46.60, because they all
+  match the same three signals with the same supporting-card counts. Nothing
+  distinguishes them. This is the strongest argument for the score floor
+  above, and possibly for a tie-breaker (mana value? how *deeply* the
+  commander engages, i.e. role count?).
+- **Aristocrats is credited to any creature-token maker.** `produces:
+  create ... creature token` means Krenko, Mob Boss reads as an Aristocrats
+  card. Tokens genuinely are sacrifice fodder, so this is defensible, but it
+  inflates: it fires on most go-wide cards. Worth revisiting if Aristocrats
+  starts showing up on commanders that have nothing to do with it.
 - **The density denominator is every identity-fitting card (choice A).**
   `scoreCommanders` divides a signal's supporting-card count by *all*
   distinct castable cards, lands included. The alternative considered and

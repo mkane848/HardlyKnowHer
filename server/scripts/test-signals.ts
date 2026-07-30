@@ -3,10 +3,12 @@
  *
  * Dependency-free (node:assert + tsx), matching the other test scripts here.
  *
- * Oracle text below is quoted from real cards wherever it is marked as such.
- * Network egress to Scryfall was blocked when these were written, so anything
- * that could not be verified against the real card is explicitly labelled
- * REPRESENTATIVE and tests the *shape* of a card rather than a specific one.
+ * Every oracle text below is copied verbatim from the imported Scryfall
+ * database, not written from memory. That matters more than it sounds:
+ * Scryfall has switched much of its self-referential wording from the card's
+ * name to "this creature" / "this land", so text recalled from older printings
+ * exercises patterns that no longer occur. Re-copy from the database rather
+ * than hand-editing these strings.
  */
 import assert from 'node:assert';
 import type { CardRow } from '../src/types';
@@ -89,40 +91,50 @@ check('stripSelfReferences removes the full name and its pre-comma short form', 
 });
 
 check('a card whose NAME contains a creature type does not thereby care about it', () => {
-  // Goblin Sharpshooter — real oracle text. Its abilities are "doesn't
-  // untap", "whenever a creature dies, untap" and a ping. It cares about
-  // creatures dying, not about Goblins. "Goblin" appears only in its name.
-  const sharpshooter = makeCard({
-    name: 'Goblin Sharpshooter',
-    type_line: 'Creature — Goblin',
-    creature_types: JSON.stringify(['Goblin']),
+  // Gitrog, Horror of Zhava — real oracle text. It is a Frog Horror whose
+  // abilities are entirely about lands; "Horror" reaches its rules text only
+  // through its own name. 267 Commander-eligible cards in the current
+  // Scryfall data have this shape.
+  const gitrog = makeCard({
+    name: 'Gitrog, Horror of Zhava',
+    type_line: 'Legendary Creature — Frog Horror',
+    creature_types: JSON.stringify(['Frog', 'Horror']),
+    keywords: JSON.stringify(['Menace']),
     oracle_text:
-      "Goblin Sharpshooter doesn't untap during your untap step.\n" +
-      'Whenever a creature dies, untap Goblin Sharpshooter.\n' +
-      '{T}: Goblin Sharpshooter deals 1 damage to any target.',
+      'Menace\n' +
+      'At the beginning of each combat, if Gitrog, Horror of Zhava is untapped, any opponent may ' +
+      'sacrifice a nontoken creature. If they do, tap Gitrog, Horror of Zhava, then seek a land card and ' +
+      'put it onto the battlefield tapped.\n' +
+      'Whenever a land enters under your control, it perpetually gains "{B}{G}, {T}, Sacrifice this land: ' +
+      'Draw a card."',
   });
-  const signals = signalsFor(sharpshooter, ['Goblin']);
+  const signals = signalsFor(gitrog, ['Horror', 'Frog']);
 
-  // It IS a Goblin — that comes from the type line, and is the whole point.
-  assert.deepStrictEqual(rolesOf(signals, 'kindred', 'Goblin'), ['is']);
-  // But `is` alone is passive, so it could never be suggested as a Goblin
-  // commander on this basis.
-  assert.strictEqual(hasActiveRole(rolesOf(signals, 'kindred', 'Goblin')), false);
+  // It IS a Horror — from the type line, which is the whole point.
+  assert.deepStrictEqual(rolesOf(signals, 'kindred', 'Horror'), ['is']);
+  // But `is` alone is passive, so it can never be suggested as a Horror
+  // commander on that basis.
+  assert.strictEqual(hasActiveRole(rolesOf(signals, 'kindred', 'Horror')), false);
+  // What it actually cares about is lands.
+  assert.ok(rolesOf(signals, 'landsMatter').includes('rewards'));
 });
 
-check('the same card still carries its text-derived signal independently', () => {
+check('a card is a kindred member by type while caring about something else', () => {
+  // Goblin Sharpshooter — real oracle text. Note Scryfall now writes "this
+  // creature" rather than the card's name, so this is no longer an instance
+  // of the name bug above; it is still the cleanest example of the two
+  // derivations being independent. Goblin by type, creature-death by text.
   const sharpshooter = makeCard({
     name: 'Goblin Sharpshooter',
     type_line: 'Creature — Goblin',
     creature_types: JSON.stringify(['Goblin']),
     oracle_text:
-      "Goblin Sharpshooter doesn't untap during your untap step.\n" +
-      'Whenever a creature dies, untap Goblin Sharpshooter.\n' +
-      '{T}: Goblin Sharpshooter deals 1 damage to any target.',
+      "This creature doesn't untap during your untap step.\n" +
+      'Whenever a creature dies, untap this creature.\n' +
+      '{T}: This creature deals 1 damage to any target.',
   });
   const signals = signalsFor(sharpshooter, ['Goblin']);
-  // Goblin kindred by type, creature-death payoff by text. Two unrelated
-  // derivations on one card.
+  assert.deepStrictEqual(rolesOf(signals, 'kindred', 'Goblin'), ['is']);
   assert.ok(rolesOf(signals, 'aristocrats').includes('rewards'));
 });
 
@@ -190,10 +202,12 @@ check('an irregular plural still counts — "Elves you control" matches Elf', ()
     name: 'Lathril, Blade of the Elves',
     type_line: 'Legendary Creature — Elf Noble',
     creature_types: JSON.stringify(['Elf', 'Noble']),
+    keywords: JSON.stringify(['Menace']),
     oracle_text:
-      'Menace\nWhenever Lathril, Blade of the Elves deals combat damage to a player, create that many 1/1 ' +
-      'black Elf Warrior creature tokens.\nTap ten untapped Elves you control: Each opponent loses 10 life. ' +
-      'You gain 10 life.',
+      "Menace (This creature can't be blocked except by two or more creatures.)\n" +
+      'Whenever Lathril deals combat damage to a player, create that many 1/1 green Elf Warrior creature ' +
+      'tokens.\n' +
+      '{T}, Tap ten untapped Elves you control: Each opponent loses 10 life and you gain 10 life.',
   });
   const roles = rolesOf(signalsFor(lathril, ['Elf']), 'kindred', 'Elf');
   assert.deepStrictEqual(roles, ['consumes', 'is', 'produces', 'rewards']);
@@ -223,8 +237,8 @@ check('granting a keyword to the team IS an active role', () => {
     creature_types: JSON.stringify(['Beast']),
     keywords: JSON.stringify(['Haste']),
     oracle_text:
-      'Haste\nWhen Craterhoof Behemoth enters the battlefield, creatures you control gain trample and get ' +
-      '+X/+X until end of turn, where X is the number of creatures you control.',
+      'Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of ' +
+      'turn, where X is the number of creatures you control.',
   });
   const signals = signalsFor(craterhoof, [], ['Trample']);
   assert.ok(rolesOf(signals, 'keywordCare', 'Trample').includes('produces'));
@@ -238,13 +252,15 @@ check('granting a keyword to the team IS an active role', () => {
 check('a fetch land is Lands Matter, not Aristocrats', () => {
   // Arid Mesa — real oracle text. It sacrifices only itself, as a cost, and
   // triggers no creature-death ability. It is still genuinely a card that
-  // puts a land into the graveyard.
+  // puts a land into the graveyard. Note "Sacrifice this land" — Scryfall no
+  // longer writes the card's name here, which is why self-sacrifice is
+  // detected from both spellings.
   const aridMesa = makeCard({
     name: 'Arid Mesa',
     type_line: 'Land',
     oracle_text:
-      '{T}, Pay 1 life, Sacrifice Arid Mesa: Search your library for a Mountain or Plains card, put it onto ' +
-      'the battlefield, then shuffle.',
+      '{T}, Pay 1 life, Sacrifice this land: Search your library for a Mountain or Plains card, put it ' +
+      'onto the battlefield, then shuffle.',
   });
   const signals = signalsFor(aridMesa);
   assert.strictEqual(find(signals, 'aristocrats'), undefined);
@@ -278,8 +294,8 @@ check('an amplifier is tagged as one, and amplifying alone is its own role', () 
     name: 'Teysa Karlov',
     type_line: 'Legendary Creature — Human Advisor',
     oracle_text:
-      'Creature tokens you control have vigilance and lifelink.\nIf a creature dying causes a triggered ' +
-      'ability of a permanent you control to trigger, that ability triggers an additional time.',
+      'If a creature dying causes a triggered ability of a permanent you control to trigger, that ability ' +
+      'triggers an additional time.\nCreature tokens you control have vigilance and lifelink.',
   });
   const signals = signalsFor(teysa);
   const aristocrats = rolesOf(signals, 'aristocrats');
@@ -291,17 +307,24 @@ check('an amplifier is tagged as one, and amplifying alone is its own role', () 
 
 // --- qualifiers: a restricted payoff only pays off its own subtype ---------
 
-check('a payoff restricted to a creature type is qualified by it', () => {
-  // REPRESENTATIVE — Sliver Gravemother's exact oracle text could not be
-  // verified (no network access to Scryfall when this was written). This
-  // tests the shape the rule exists for: a graveyard payoff that only ever
-  // looks at Slivers.
-  const gravemother = makeCard({
+/** Sliver Gravemother — real oracle text, reminder text and all. */
+function sliverGravemother(): CardRow {
+  return makeCard({
     name: 'Sliver Gravemother',
     type_line: 'Legendary Creature — Sliver',
     creature_types: JSON.stringify(['Sliver']),
-    oracle_text: 'Sliver spells you cast have encore.',
+    keywords: JSON.stringify(['Encore']),
+    oracle_text:
+      'The "legend rule" doesn\'t apply to Slivers you control.\n' +
+      'Each Sliver creature card in your graveyard has encore {X}, where X is its mana value.\n' +
+      'Encore {5} ({5}, Exile this card from your graveyard: For each opponent, create a token copy that ' +
+      'attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the ' +
+      'next end step. Activate only as a sorcery.)',
   });
+}
+
+check('a payoff restricted to a creature type is qualified by it', () => {
+  const gravemother = sliverGravemother();
   const signals = signalsFor(gravemother, ['Sliver', 'Goblin']);
 
   const reanimator = find(signals, 'reanimator', 'Sliver');
@@ -312,6 +335,18 @@ check('a payoff restricted to a creature type is qualified by it', () => {
   assert.strictEqual(find(signals, 'reanimator', undefined), undefined);
   // And it is a Sliver kindred payoff in its own right.
   assert.ok(hasActiveRole(rolesOf(signals, 'kindred', 'Sliver')));
+});
+
+check('reminder text does not create signals', () => {
+  // Sliver Gravemother's Encore reminder text ends "They gain haste", which
+  // read as the card granting haste to your team — an active Haste payoff it
+  // does not have. Reminder text restates a keyword the card already has and
+  // is never an ability of its own.
+  const signals = signalsFor(sliverGravemother(), ['Sliver'], ['Haste']);
+  assert.ok(
+    !rolesOf(signals, 'keywordCare', 'Haste').includes('produces'),
+    'haste from reminder text should not count as granting haste'
+  );
 });
 
 check('an unrestricted reanimator stays unqualified', () => {
