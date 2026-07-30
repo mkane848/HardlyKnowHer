@@ -9,6 +9,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-07-30
+
 ### Fixed
 
 - **The Scryfall bulk import was completely broken**, which also broke fresh
