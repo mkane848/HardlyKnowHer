@@ -1,8 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { createGunzip } from 'node:zlib';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
-const OUTPUT_PATH = path.join(DATA_DIR, 'oracle-cards.json');
+// JSONL, not JSON: Scryfall's bulk endpoint now publishes newline-delimited
+// JSON, gzipped. See BulkDataEntry below.
+const OUTPUT_PATH = path.join(DATA_DIR, 'oracle-cards.jsonl');
 
 // How long a downloaded copy is considered good enough to reuse. The bulk
 // file only changes when Scryfall republishes it (roughly daily), and the
@@ -43,11 +48,24 @@ const SCRYFALL_HEADERS = {
   Accept: 'application/json;q=0.9,*/*;q=0.8',
 };
 
+/**
+ * One entry in Scryfall's bulk-data list.
+ *
+ * Scryfall changed this shape: entries used to carry `download_uri` (a plain
+ * uncompressed JSON array) and `size`. Both are gone. The replacements are
+ * `jsonl_download_uri` — newline-delimited JSON, gzipped — and
+ * `compressed_size`. Reading the old field names silently yielded
+ * `undefined`, which surfaced as "Failed to parse URL from undefined" and a
+ * download size of "~NaNMB".
+ *
+ * Both fields are optional here so a future rename fails with the explicit
+ * check below rather than another undefined-URL crash.
+ */
 interface BulkDataEntry {
   type: string;
-  download_uri: string;
   updated_at: string;
-  size: number;
+  jsonl_download_uri?: string;
+  compressed_size?: number;
 }
 
 /**
@@ -98,23 +116,43 @@ async function main() {
     throw new Error('Could not find an "oracle_cards" entry in the Scryfall bulk data list.');
   }
 
-  const sizeMb = (oracleCards.size / 1024 / 1024).toFixed(1);
-  console.log(`Found Oracle Cards (updated ${oracleCards.updated_at}, ~${sizeMb}MB). Downloading...`);
+  const downloadUri = oracleCards.jsonl_download_uri;
+  if (!downloadUri) {
+    throw new Error(
+      'The "oracle_cards" bulk entry has no `jsonl_download_uri`. Scryfall has probably renamed the ' +
+        'field again — check https://scryfall.com/docs/api/bulk-data for the current shape. ' +
+        `Fields present: ${Object.keys(oracleCards).join(', ')}`
+    );
+  }
 
-  const fileRes = await fetch(oracleCards.download_uri, {
-    headers: SCRYFALL_HEADERS,
-  });
+  const sizeMb = oracleCards.compressed_size
+    ? `~${(oracleCards.compressed_size / 1024 / 1024).toFixed(1)}MB compressed`
+    : 'size unknown';
+  console.log(`Found Oracle Cards (updated ${oracleCards.updated_at}, ${sizeMb}). Downloading...`);
+
+  const fileRes = await fetch(downloadUri, { headers: SCRYFALL_HEADERS });
   if (!fileRes.ok) {
     throw new Error(`Failed to download bulk file (${await describeFailure(fileRes)})`);
+  }
+  if (!fileRes.body) {
+    throw new Error('Bulk file response had no body.');
   }
 
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  const buffer = Buffer.from(await fileRes.arrayBuffer());
-  fs.writeFileSync(OUTPUT_PATH, buffer);
-  console.log(`Saved to ${OUTPUT_PATH} (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB).`);
+  // Streamed rather than buffered: the file is ~25MB gzipped but expands to
+  // several hundred MB, and there's no reason to hold all of that in memory
+  // on the way to disk.
+  await pipeline(
+    Readable.fromWeb(fileRes.body as Parameters<typeof Readable.fromWeb>[0]),
+    createGunzip(),
+    fs.createWriteStream(OUTPUT_PATH)
+  );
+
+  const written = fs.statSync(OUTPUT_PATH).size;
+  console.log(`Saved to ${OUTPUT_PATH} (${(written / 1024 / 1024).toFixed(1)}MB uncompressed).`);
 }
 
 main().catch((err) => {

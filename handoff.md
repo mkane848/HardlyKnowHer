@@ -255,7 +255,7 @@ server/                Express + TS + better-sqlite3
     test-eligibility.ts           npm test — front-face rule for DFC/flip/adventure/split layouts
     test-singleton.ts             npm test — copy limits, exemptions, and repeated-line merging
     test-synergy.ts               npm test — profiling + scoring, incl. union-across-a-pair semantics
-  data/                     gitignored; oracle-cards.json + cards.sqlite live here
+  data/                     gitignored; oracle-cards.jsonl + cards.sqlite live here
 ```
 
 ## Core logic, summarized (read the files for full detail)

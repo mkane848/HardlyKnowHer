@@ -83,9 +83,10 @@ npm run install:all
 cd server && npm run prepare-data
 ```
 
-This downloads Scryfall's **Oracle Cards** bulk file (~150–200MB, one entry
-per unique card) to `server/data/oracle-cards.json` and seeds
-`server/data/cards.sqlite` from it. Takes a few minutes on a home connection.
+This downloads Scryfall's **Oracle Cards** bulk file (~25MB gzipped, one entry
+per unique card), decompresses it to `server/data/oracle-cards.jsonl` (~190MB),
+and seeds `server/data/cards.sqlite` from it. Takes a few minutes on a home
+connection.
 
 **It won't re-download if you already have a copy less than a week old** — it
 reuses what's on disk and tells you how old it is, so iterating locally
@@ -300,7 +301,7 @@ server/                     Express + TS + better-sqlite3
     fetch-scryfall.ts           Downloads the Oracle Cards bulk file (skips if recent)
     import-scryfall.ts          Seeds cards.sqlite from the downloaded bulk file
     test-*.ts                    npm test — dependency-free node:assert + tsx test files
-  data/                         (gitignored) oracle-cards.json + cards.sqlite live here
+  data/                         (gitignored) oracle-cards.jsonl + cards.sqlite live here
 ```
 
 ## Deploying

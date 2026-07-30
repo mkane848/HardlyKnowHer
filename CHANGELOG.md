@@ -9,6 +9,20 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Scryfall bulk import was completely broken**, which also broke fresh
+  deploys, since a deploy rebuilds the card database from scratch. Scryfall
+  changed the shape of their bulk-data listing: `download_uri` (an
+  uncompressed JSON array) and `size` are gone, replaced by
+  `jsonl_download_uri` — gzipped, newline-delimited JSON — and
+  `compressed_size`. Reading the old field names yielded `undefined`, so the
+  fetch died with "Failed to parse URL from undefined" after reporting a
+  download size of "~NaNMB". The download is now streamed and gunzipped
+  straight to disk instead of being buffered whole, and the importer reads
+  JSONL line by line. If Scryfall renames the field again, the failure is now
+  an explicit message naming the fields it did find.
+
 ## [1.5.0] — 2026-07-28
 
 ### Fixed
