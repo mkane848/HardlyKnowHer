@@ -430,6 +430,58 @@ server/                Express + TS + better-sqlite3
 
 ## Known risk areas / things to verify
 
+- **The role vocabulary in `signals.ts` is provisional and wants review.**
+  `Role` is currently `is / produces / consumes / rewards / amplifies`. It
+  replaced an earlier "Outlet / Payoff" split that was reported as *not
+  quite right*, and the five roles are an inference drawn from worked
+  examples rather than a model anyone has signed off on. The specific
+  problem with Outlet/Payoff was that real cards almost never separate the
+  two — Lathril's activated ability consumes ten Elves and rewards you in
+  the same breath, and Viscera Seer is a sacrifice outlet whose entire
+  point is the scry it hands back. Splitting `consumes` from `rewards`
+  lets one ability be both, which Outlet/Payoff could not express.
+  Cases known to still sit awkwardly:
+  - **Goblin Sharpshooter** reads as `rewards` on creature-death (it untaps
+    whenever a creature dies), but players describe it as a *sacrifice
+    outlet*, because with any outlet it becomes a machine gun. It enables a
+    loop it does not itself contain, and no current role captures
+    "enables". If a sixth role is ever added, this is the case that
+    justifies it.
+  - **`is` is deliberately not wired into Aristocrats.** A vanilla creature
+    genuinely is sacrifice fodder, but counting it would make every
+    creature deck read as Aristocrats.
+  - **Changelings** are every creature type by rule, but Scryfall's type
+    line says `Creature — Shapeshifter`, so no type-based test will ever
+    see one as a Goblin. Accepted, not special-cased.
+- **Signal detection has never been run against real card data.** Network
+  egress to `api.scryfall.com` / `data.scryfall.io` was blocked in the
+  session that wrote `signals.ts`, so every rule is covered by unit tests
+  over hand-built rows and by oracle text quoted from memory. Text marked
+  `REPRESENTATIVE` in `test-signals.ts` (currently only Sliver Gravemother)
+  could not be verified against the real card at all and tests the *shape*
+  of a card rather than a specific one. First thing to do with a working
+  import: run real lists through it and check the archetypes that come
+  back, especially the regex-heavy ones (`landsMatter`, `selfMill`,
+  `voltron`).
+- **The density denominator is every identity-fitting card (choice A).**
+  `scoreCommanders` divides a signal's supporting-card count by *all*
+  distinct castable cards, lands included. The alternative considered and
+  not taken (**choice B**) excludes lands from the denominator, on the
+  reasoning that lands are infrastructure every deck needs in roughly equal
+  measure rather than evidence that a commander fits your list — a Mountain
+  says nothing about fit, whereas a vanilla Goblin genuinely does (it's a
+  body a go-wide commander uses and a spellslinger doesn't). Choice A was
+  kept deliberately, to be revisited once there's real testing to compare
+  against. Note the change is smaller than it sounds: the depth bonus is a
+  flat card count and unaffected by the denominator, so only the breadth
+  term moves. If you switch, expect breadth to rise across the board and
+  the score floor (below) to need recalibrating with it.
+- **There is still no minimum score to be recommended.** A floor of ~5.0
+  was proposed as a starting point — roughly "one signal with 8 or more
+  real cards behind it" on a 100-card list — but deliberately not
+  implemented, because the signal rework changes the score distribution and
+  a floor calibrated against the old numbers would over-prune. Set it after
+  running real lists.
 - **`better-sqlite3` is a native module.** This bit us on the real Render
   deploy: v11 (the original pin) has no prebuilt binary for newer Node
   versions and falls back to compiling from source, which fails outright
