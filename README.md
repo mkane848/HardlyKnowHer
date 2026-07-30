@@ -192,15 +192,35 @@ either card would show on its own is enough to suggest the pair.
 ## Why a commander was suggested
 
 Each suggestion has a **"Why this commander?"** disclosure. Expanding it shows
-every creature type, keyword, and theme it shares with your list, the
-specific cards behind each of those signals, and which cards drive the
-Bracket estimate. Only cards that fit the commander's color identity are
-cited, and a theme/kindred type/keyword only counts — both as a reason shown here
-and toward whether the commander is suggested at all — if it still has at
-least three citable cards once narrowed that way. A global match that
-thins out to one or two cards once narrowed to this commander's own colors
+every archetype, creature type, and keyword it shares with your list, and the
+specific cards behind each of those signals. Only cards that fit the
+commander's color identity are cited, and a signal only counts — both as a
+reason shown here and toward whether the commander is suggested at all — if it
+still has at least three citable cards once narrowed that way. A global match
+that thins out to one or two cards once narrowed to this commander's own colors
 isn't a real pattern, so it's dropped entirely rather than shown as a weak
 reason.
+
+**A commander has to actually care.** Sharing a property with your cards is
+never enough on its own. Being a Goblin doesn't make a commander a Goblin
+commander — Goblin Sharpshooter is a Goblin whose abilities care about
+creatures dying, not about Goblins, and its name is not evidence of anything.
+Having Trample doesn't make one a Trample payoff either; granting trample to
+your whole team, the way Craterhoof Behemoth does, is what counts. Every
+signal is read from two sides: which group your card *belongs to* comes from
+structured data (its creature types, its keywords, the tokens it makes — so
+Krenko's Command is a Goblin card despite being a Sorcery), while whether the
+commander *pays that group off* is read from its rules text.
+
+Payoffs that name a subtype only pay off that subtype. A commander that
+reanimates Slivers specifically feeds **"Reanimator (Sliver)"**, not generic
+Reanimator, and the non-Sliver creatures in your graveyard don't count toward
+it.
+
+Context decides which archetype a card lands in. A fetch land like Arid Mesa
+sacrifices itself, so it supports **Lands Matter** — it never triggers a
+creature-death ability, so it isn't Aristocrats, which is specifically about
+sacrificing *creatures*.
 
 Each cited card's name shows its art on hover (or on tap, on a touch screen)
 without leaving the list, and its mana value alongside the name. Tapping a
@@ -310,8 +330,20 @@ See [`DEPLOY.md`](./DEPLOY.md) for a free, one-click Render setup (the repo's
 
 ## Known limitations (v1)
 
-- Synergy detection is theme/kindred-pattern matching on oracle text, not a
-  full combo or archetype model — it'll miss subtler synergies.
+- Synergy detection still bottoms out in pattern matching on oracle text.
+  The archetype catalog understands roles, object types, and subtype
+  restrictions, but a card only lands in an archetype if its wording matches
+  a pattern someone wrote — subtler synergies, and cards templated in an
+  unusual way, will be missed.
+- The role vocabulary (`is` / `produces` / `consumes` / `rewards` /
+  `amplifies`) is provisional. It has no way to express "enables" — Goblin
+  Sharpshooter combos with any sacrifice outlet, but contains no loop of its
+  own, and is currently filed only as a creature-death payoff. See
+  `handoff.md`.
+- Changelings are every creature type by rule, but their type line reads
+  `Creature — Shapeshifter`, so they won't count toward any kindred signal.
+- Suggestions have no minimum score — a commander with one bare-minimum
+  signal is still listed, just far down.
 - Bracket estimate only accounts for Game Changers, not combos/MLD/extra
   turns (see above).
 - Card name lookup is exact-match (case-insensitive) apart from the

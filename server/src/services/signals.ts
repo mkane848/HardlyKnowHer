@@ -1,0 +1,681 @@
+/**
+ * The signal model: what a card contributes to a deck's plan, and in what
+ * capacity.
+ *
+ * This replaces the old flat "theme" model, in which a signal was a single
+ * regex applied identically to your card and to the candidate commander, and
+ * two cards "synergised" when the same words appeared in both. That measured
+ * lexical co-occurrence rather than synergy: "Sacrifice a creature" and
+ * "Sacrifice Arid Mesa" are the same word and completely different mechanics,
+ * and a commander that pays off a plan (Craterhoof Behemoth pumping your
+ * board) usually shares no vocabulary at all with the cards that set it up.
+ *
+ * Three ideas do the work here.
+ *
+ * 1. ROLES. A card doesn't just "have" a theme, it participates in one in a
+ *    particular capacity — see `Role`. This is what lets one card carry
+ *    several unrelated signals: Goblin Sharpshooter is Goblin kindred because
+ *    of its creature *type*, and part of the creature-death cluster because of
+ *    its *text*, and those two facts have nothing to do with each other.
+ *
+ * 2. TWO SIDES. Membership in a group is read off structured data wherever it
+ *    exists (creature types, keywords, type line); qualifying as a *payoff*
+ *    is read off rules text. A card's NAME is never evidence of anything —
+ *    see `stripSelfReferences` for why that mattered.
+ *
+ * 3. QUALIFIERS. A payoff can be restricted to a subtype, and then it only
+ *    pays off cards of that subtype. Sliver Gravemother cares about Slivers
+ *    in the graveyard, so it feeds "Reanimator (Sliver)" — not generic
+ *    Reanimator — and every non-Sliver creature in your bin is worth nothing
+ *    to it.
+ *
+ * Extending this: adding an archetype means adding one entry to `ARCHETYPES`
+ * with per-role matchers. `Role`, `QualifierKind` and the catalog are all
+ * meant to grow; nothing here is closed.
+ */
+import type { CardRow } from '../types';
+
+/**
+ * The capacity in which a card participates in an archetype.
+ *
+ * KNOWN LIMITATION — this vocabulary is provisional and wants review. It
+ * replaces an earlier "Outlet / Payoff" split that was reported as "not quite
+ * right", and these five are an inference from worked examples rather than a
+ * model anyone has signed off on. The specific problem with Outlet/Payoff was
+ * that the two are almost never separable on a real card: Lathril's activated
+ * ability *consumes* ten Elves and *rewards* you in the same breath, and
+ * Viscera Seer is a sacrifice outlet whose whole point is the scry it gives
+ * back. Splitting "consumes" from "rewards" lets one ability be both, which
+ * Outlet/Payoff could not express.
+ *
+ * Cases known to still sit awkwardly:
+ *  - Goblin Sharpshooter reads as `rewards` on creature-death here (it untaps
+ *    when a creature dies), but it's often *described* as a sacrifice outlet,
+ *    because with any outlet it becomes a machine gun. The card enables a
+ *    loop it does not itself contain, and no role below captures "enables".
+ *  - `is` on a vanilla creature is deliberately not wired into Aristocrats,
+ *    even though a vanilla creature genuinely is sacrifice fodder — counting
+ *    it would make every creature deck read as Aristocrats.
+ */
+export type Role =
+  /** The card *is* the resource: a Goblin, an Equipment, a land. Structured
+   * data, never text. Passive — see `ACTIVE_ROLES`. */
+  | 'is'
+  /** The card *makes* the resource: Goblin tokens, extra land drops, cards
+   * into your own graveyard. */
+  | 'produces'
+  /** The card *needs* the resource, as a cost or a requirement: "Sacrifice a
+   * creature:", "Tap ten untapped Elves:". */
+  | 'consumes'
+  /** The card *benefits* from the resource existing or the event happening:
+   * Blood Artist, Craterhoof Behemoth, Teysa buffing your tokens. */
+  | 'rewards'
+  /** The card *doubles or repeats* the resource or event: Doubling Season,
+   * Teysa making death triggers fire twice. A card that only amplifies needs
+   * something else to amplify — it generates no value alone. */
+  | 'amplifies';
+
+export const ROLES: Role[] = ['is', 'produces', 'consumes', 'rewards', 'amplifies'];
+
+/**
+ * Roles that mean the card actually engages with the plan, as opposed to
+ * merely being a member of a group.
+ *
+ * This is the generalisation of the old "cares, not shares" kindred rule: a
+ * commander needs at least one active role to be suggested for an archetype.
+ * Silas Renn *is* a Human (`is`) and never mentions Humans, so he is not a
+ * Human commander. Krenko *produces* Goblins and *rewards* having them, so he
+ * is. The same test now covers keywords for free — having Trample is `is`,
+ * granting it to your team is `produces`.
+ */
+export const ACTIVE_ROLES: Role[] = ['produces', 'consumes', 'rewards', 'amplifies'];
+
+export function hasActiveRole(roles: Role[]): boolean {
+  return roles.some((r) => ACTIVE_ROLES.includes(r));
+}
+
+/** What a qualifier narrows a signal to. Open to growth — card types and
+ * permanent types are the obvious next two. */
+export type QualifierKind = 'creatureType' | 'keyword';
+
+/** One archetype a card participates in, with the capacities it does so in. */
+export interface SignalMatch {
+  archetype: string;
+  label: string;
+  description: string;
+  weight: number;
+  /** Present when the signal is restricted — "Reanimator (Sliver)". */
+  qualifier?: string;
+  qualifierKind?: QualifierKind;
+  roles: Role[];
+}
+
+/** A signal's stable identity, so the same archetype at different qualifiers
+ * counts as different signals. */
+export function signalKey(match: SignalMatch): string {
+  return match.qualifier ? `${match.archetype}:${match.qualifier}` : match.archetype;
+}
+
+// ---------------------------------------------------------------------------
+// Card facts
+// ---------------------------------------------------------------------------
+
+/** Everything the matchers below are allowed to look at. */
+export interface CardFacts {
+  name: string;
+  typeLine: string;
+  /** Oracle text with the card's own name(s) removed. Match against this. */
+  text: string;
+  /** Oracle text as printed. Only for facts that need to see a self-reference,
+   * like `sacrificesItself`. */
+  rawText: string;
+  creatureTypes: string[];
+  keywords: string[];
+  /** Creature types this card creates tokens of. "Create two 1/1 red Goblin
+   * creature tokens" makes Krenko's Command a Goblin card despite a Sorcery
+   * having no creature types of its own. */
+  producedTokenTypes: string[];
+  /** The card sacrifices *itself* — a fetch land, a Blood Crypt-style cost.
+   * Distinct from sacrificing an indefinite object, which is the Aristocrats
+   * pattern. */
+  sacrificesItself: boolean;
+  isLand: boolean;
+  isCreature: boolean;
+  isEquipment: boolean;
+  isAura: boolean;
+}
+
+/**
+ * Removes the card's own name from its oracle text.
+ *
+ * A card's rules text refers to itself by name, so any check that regexes a
+ * word against oracle text will match that word for free when it appears in
+ * the name. Goblin Sharpshooter's abilities are "doesn't untap", "whenever a
+ * creature dies, untap" and a ping — it does not care about Goblins in the
+ * slightest — yet it matched Goblin kindred purely because "Goblin" is in its
+ * name. Names are not abilities, so they are removed before anything reads
+ * the text.
+ *
+ * Both the full name and the pre-comma short form go, since rules text uses
+ * the short form ("Lathril" for "Lathril, Blade of the Elves").
+ */
+export function stripSelfReferences(text: string, ...names: (string | null)[]): string {
+  let out = text;
+  const forms = new Set<string>();
+  for (const name of names) {
+    if (!name) continue;
+    forms.add(name);
+    // "Lathril, Blade of the Elves" -> also strip "Lathril".
+    const short = name.split(',')[0].trim();
+    if (short && short !== name) forms.add(short);
+  }
+  // Longest first, so the full name goes before its own short form.
+  for (const form of [...forms].sort((a, b) => b.length - a.length)) {
+    out = out.split(form).join(' ');
+  }
+  return out;
+}
+
+function parseJsonArray(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Creature types of tokens this card creates.
+ *
+ * Scoped to `knownTypes` — the creature types actually present in the
+ * submitted list — rather than trying to carry Magic's full type list around.
+ * A token type nobody owns cannot support a signal anyway, so nothing is lost.
+ */
+function findProducedTokenTypes(text: string, knownTypes: string[]): string[] {
+  const found = new Set<string>();
+  // Each "create ... token" clause, so a type mentioned elsewhere in an
+  // unrelated sentence isn't credited as a token type.
+  for (const clause of text.match(/create[^.;]*token[^.;]*/gi) ?? []) {
+    for (const type of knownTypes) {
+      if (wordPattern(type).test(clause)) found.add(type);
+    }
+  }
+  return [...found];
+}
+
+const wordPatternCache = new Map<string, RegExp>();
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The English plural of a creature type, because cards refer to a type in the
+ * aggregate — "Elves you control", not "Elf you control". Only the irregular
+ * endings Magic's type list actually contains are handled.
+ */
+export function pluralOfType(type: string): string {
+  // Elf -> Elves, Dwarf -> Dwarves. Lathril says "ten untapped Elves you
+  // control", so missing this drops one of the format's best-known kindred
+  // commanders.
+  if (/f$/i.test(type)) return type.replace(/f$/i, 'ves');
+  // Sphinx -> Sphinxes, Fungus -> Funguses, Leech -> Leeches.
+  if (/(s|x|z|ch|sh)$/i.test(type)) return `${type}es`;
+  return `${type}s`;
+}
+
+const tokenDescriptorCache = new Map<string, RegExp>();
+
+/**
+ * A token's printed type line inside a "create" clause — "Goblin creature
+ * tokens", "Elf Warrior creature tokens". One optional intervening word so a
+ * token with two creature types still matches.
+ */
+function tokenDescriptorPattern(type: string): RegExp {
+  let pattern = tokenDescriptorCache.get(type);
+  if (!pattern) {
+    const forms = `(?:${escapeRegExp(type)}|${escapeRegExp(pluralOfType(type))})`;
+    pattern = new RegExp(`\\b${forms}(?:\\s+\\w+)?\\s+(?:creature\\s+)?tokens?\\b`, 'gi');
+    tokenDescriptorCache.set(type, pattern);
+  }
+  // Shared cached regex with /g — reset before each use.
+  pattern.lastIndex = 0;
+  return pattern;
+}
+
+/** Matches a word or its plural, on a word boundary. Cached: this runs against
+ * every candidate in a pool of thousands. */
+function wordPattern(word: string): RegExp {
+  let pattern = wordPatternCache.get(word);
+  if (!pattern) {
+    pattern = new RegExp(`\\b(?:${escapeRegExp(word)}|${escapeRegExp(pluralOfType(word))})\\b`, 'i');
+    wordPatternCache.set(word, pattern);
+  }
+  return pattern;
+}
+
+export function buildCardFacts(row: CardRow, knownTypes: string[]): CardFacts {
+  const rawText = row.oracle_text ?? '';
+  const text = stripSelfReferences(rawText, row.name, row.back_name ?? null);
+  const typeLine = row.type_line ?? '';
+  return {
+    name: row.name,
+    typeLine,
+    text,
+    rawText,
+    creatureTypes: parseJsonArray(row.creature_types),
+    keywords: parseJsonArray(row.keywords),
+    producedTokenTypes: findProducedTokenTypes(text, knownTypes),
+    // Read off the RAW text on purpose: "Sacrifice Arid Mesa:" is only
+    // recognisable as self-sacrifice while the name is still there. After
+    // stripping it reads "Sacrifice :", which is why this fact is computed
+    // here rather than pattern-matched later.
+    sacrificesItself: new RegExp(`sacrifice ${escapeRegExp(row.name.split(',')[0].trim())}\\b`, 'i').test(rawText),
+    isLand: /\bLand\b/.test(typeLine),
+    isCreature: /\bCreature\b/.test(typeLine),
+    isEquipment: /\bEquipment\b/.test(typeLine),
+    isAura: /\bAura\b/.test(typeLine),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The archetype catalog
+// ---------------------------------------------------------------------------
+
+type Matcher = RegExp | ((f: CardFacts) => boolean);
+
+export interface ArchetypeDef {
+  key: string;
+  label: string;
+  description: string;
+  weight: number;
+  /** Per-role matchers. A card matching any matcher for a role gains it. */
+  roles: Partial<Record<Role, Matcher[]>>;
+  /**
+   * When set, a match may be narrowed to a creature type the card's text
+   * restricts it to — the Sliver Gravemother case. A qualified signal only
+   * counts supporters of that type, and separately implies kindred for it.
+   */
+  qualifiable?: QualifierKind;
+}
+
+function matches(matcher: Matcher, facts: CardFacts): boolean {
+  return typeof matcher === 'function' ? matcher(facts) : matcher.test(facts.text);
+}
+
+/**
+ * Archetypes keyed by their real names, because that's what a player would
+ * call them. Kindred and keyword-care are generated per qualifier rather than
+ * listed here — see `detectKindred` / `detectKeywordCare`.
+ *
+ * Weights are a first pass and want tuning against real lists; they were set
+ * before any measurement was possible.
+ */
+export const ARCHETYPES: ArchetypeDef[] = [
+  {
+    key: 'aristocrats',
+    label: 'Aristocrats',
+    description:
+      'Sacrificing your own creatures for value — fodder, an outlet to sacrifice it to, and payoffs that ' +
+      'trigger when a creature dies. Deliberately creature-specific: sacrificing an artifact or a land is a ' +
+      'different deck.',
+    weight: 20,
+    roles: {
+      // "Sacrifice a creature:" — an indefinite creature, not itself. A fetch
+      // land sacrificing itself for mana is not this synergy even though the
+      // word appears.
+      consumes: [/\bsacrifice (?:a|an|another|two|three|four|\d+|x)\b[^.;]*\bcreature/i],
+      // "dying" as well as "dies": Teysa Karlov reads "If a creature dying
+      // causes a triggered ability ... to trigger".
+      rewards: [/(?:whenever|if)[^.;]*\b(?:dies|dying)\b/i],
+      produces: [/create[^.;]*\bcreature token/i],
+      amplifies: [/\b(?:dies|dying)\b[^.]*triggers? an additional time/i],
+    },
+  },
+  {
+    key: 'goWide',
+    label: 'Go-Wide Combat',
+    description:
+      'Winning through a board full of creatures rather than a combo — mass pumps, evasion granted to the ' +
+      'team, and payoffs that scale with how many creatures you control.',
+    weight: 18,
+    roles: {
+      produces: [/create[^.;]*\bcreature token/i],
+      rewards: [
+        /where x is the number of creatures you control/i,
+        /creatures you control (?:get|gain|have)/i,
+        // Teysa Karlov buffs the tokens specifically, which is a go-wide
+        // payoff even though it never says "creatures you control".
+        /creature tokens you control (?:get|gain|have)/i,
+        /whenever you attack/i,
+        /whenever[^.;]*creatures? you control attacks?/i,
+      ],
+      amplifies: [/would create[^.]*tokens?[^.]*instead/i, /create twice (?:that many|as many) tokens/i],
+    },
+  },
+  {
+    key: 'voltron',
+    label: 'Voltron',
+    description:
+      'Stacking Equipment and Auras onto one creature — often the commander — and winning through a single ' +
+      'hard-to-answer threat.',
+    weight: 20,
+    roles: {
+      is: [(f) => f.isEquipment || f.isAura],
+      produces: [/\battach\b/i, /\benchant creature\b/i],
+      consumes: [/\bequip \{/i],
+      rewards: [
+        /equipped creature (?:gets|has|gains)/i,
+        /enchanted creature (?:gets|has|gains)/i,
+        /as long as[^.;]*(?:equipped|enchanted)/i,
+        /for each (?:equipment|aura)/i,
+      ],
+    },
+  },
+  {
+    key: 'landsMatter',
+    label: 'Lands Matter',
+    description:
+      'Treating lands as a resource to be played, sacrificed, and recurred — extra land drops, landfall ' +
+      'payoffs, and lands that put themselves into the graveyard.',
+    weight: 20,
+    roles: {
+      // A fetch land sacrificing itself belongs here rather than in
+      // Aristocrats: nothing about it triggers a creature-death ability, but
+      // it genuinely feeds a deck that cares about lands hitting the bin.
+      produces: [
+        (f) => f.sacrificesItself && f.isLand,
+        /\bsacrifice (?:a|an|another)\b[^.;]*\bland/i,
+        /search your library for[^.;]*land[^.;]*(?:onto|into) the battlefield/i,
+        /play an additional land/i,
+        /put[^.;]*land[^.;]*from your (?:hand|graveyard)[^.;]*onto the battlefield/i,
+      ],
+      rewards: [/\blandfall\b/i, /whenever a land (?:you control )?enters/i, /for each land you control/i],
+      consumes: [/\bsacrifice (?:a|an|another)\b[^.;]*\bland/i],
+    },
+  },
+  {
+    key: 'spellslinger',
+    label: 'Spellslinger',
+    description: 'Payoffs for chaining instants and sorceries rather than deploying creatures.',
+    weight: 20,
+    roles: {
+      rewards: [
+        /instant or sorcery spell/i,
+        /whenever you cast an? (?:instant|sorcery)/i,
+        /whenever you cast a noncreature spell/i,
+        /instant and sorcery spells? (?:you cast )?costs? \{?\d/i,
+      ],
+      amplifies: [/copy (?:it\.|that spell|the (?:target|next) instant or sorcery)/i],
+    },
+  },
+  {
+    key: 'counters',
+    label: '+1/+1 Counters',
+    description: 'Growing creatures with +1/+1 counters, and the payoffs that read how many are out there.',
+    weight: 20,
+    roles: {
+      produces: [/put (?:a|an|one|two|three|x|\d+)[^.;]*\+1\/\+1 counters?/i, /\b(?:adapt|evolve|bolster|outlast)\b/i],
+      rewards: [/whenever[^.;]*\+1\/\+1 counter/i, /for each \+1\/\+1 counter/i],
+      amplifies: [/would (?:put|distribute) one or more[^.]*counters[^.]*instead/i, /twice that many[^.]*counters/i],
+    },
+  },
+  {
+    key: 'reanimator',
+    label: 'Reanimator',
+    description:
+      'Cheating creatures out of the graveyard onto the battlefield for less than they would cost to cast.',
+    weight: 22,
+    // Sliver Gravemother cares specifically about Slivers being in the
+    // graveyard, so it feeds Reanimator (Sliver) rather than generic
+    // Reanimator, and non-Sliver creatures in your bin do not support it.
+    qualifiable: 'creatureType',
+    roles: {
+      rewards: [
+        /return[^.;]*creature[^.;]*from (?:your|a) graveyard to the battlefield/i,
+        /put[^.;]*creature card[^.;]*from (?:your|a) graveyard onto the battlefield/i,
+        /\bencore\b/i,
+        /\bunearth\b/i,
+        /\beternalize\b/i,
+        /\bembalm\b/i,
+      ],
+      consumes: [/\bexile[^.;]*from your graveyard\b/i],
+    },
+  },
+  {
+    key: 'selfMill',
+    label: 'Self-Mill',
+    description:
+      'Filling your own graveyard on purpose, as setup for reanimation or for payoffs that read your ' +
+      'graveyard. Distinct from milling an opponent, which is an attack rather than a resource.',
+    weight: 18,
+    roles: {
+      produces: [
+        /you mill \w+/i,
+        /mill \w+ cards?\./i,
+        /put the top \w+ cards? of your library into your graveyard/i,
+        /\bsurveil\b/i,
+        /\bdredge\b/i,
+      ],
+      rewards: [/for each creature card in your graveyard/i, /cards? in your graveyard/i],
+    },
+  },
+  {
+    key: 'opponentMill',
+    label: 'Mill (Opponents)',
+    description:
+      "Emptying opponents' libraries as a route to winning. Separate from self-mill: the cards go to a " +
+      'graveyard you cannot use.',
+    weight: 16,
+    roles: {
+      produces: [
+        /each opponent mills/i,
+        /target (?:player|opponent) mills/i,
+        /defending player mills/i,
+        /each other player mills/i,
+      ],
+      rewards: [/cards? in (?:their|an opponent's) graveyard/i],
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Detection
+// ---------------------------------------------------------------------------
+
+/** Splits text into clauses, so a qualifier is only picked up from the same
+ * sentence as the payoff it restricts. */
+function clauses(text: string): string[] {
+  return text.split(/[.;\n]/).filter((c) => c.trim().length > 0);
+}
+
+/**
+ * The creature type a qualifiable archetype's payoff is restricted to, if any.
+ *
+ * Only a type mentioned in the same clause as the payoff counts — a commander
+ * that reanimates anything and separately happens to mention Goblins is not a
+ * Goblin-restricted reanimator.
+ */
+function findQualifier(facts: CardFacts, def: ArchetypeDef, knownTypes: string[]): string | undefined {
+  const payoffMatchers = [...(def.roles.rewards ?? []), ...(def.roles.consumes ?? [])];
+  for (const clause of clauses(facts.text)) {
+    const hit = payoffMatchers.some((m) => (typeof m === 'function' ? false : m.test(clause)));
+    if (!hit) continue;
+    for (const type of knownTypes) {
+      if (wordPattern(type).test(clause)) return type;
+    }
+  }
+  return undefined;
+}
+
+function rolesFor(def: ArchetypeDef, facts: CardFacts): Role[] {
+  const found: Role[] = [];
+  for (const role of ROLES) {
+    const matchers = def.roles[role];
+    if (matchers?.some((m) => matches(m, facts))) found.push(role);
+  }
+  return found;
+}
+
+/** Kindred, one signal per creature type. Membership is structural (the card's
+ * own type, or a token type it makes); caring about the type is textual. */
+function detectKindred(facts: CardFacts, knownTypes: string[]): SignalMatch[] {
+  const out: SignalMatch[] = [];
+  for (const type of knownTypes) {
+    const roles: Role[] = [];
+    // Structured data only — never the name. Goblin Sharpshooter is a Goblin
+    // because its type line says so.
+    if (facts.creatureTypes.includes(type)) roles.push('is');
+    // "Create two 1/1 red Goblin creature tokens" makes Krenko's Command a
+    // Goblin card even though a Sorcery has no creature type.
+    if (facts.producedTokenTypes.includes(type)) roles.push('produces');
+
+    // Naming the token's type is not caring about the type — "create two 1/1
+    // red Goblin creature tokens" already counted as `produces` above, and
+    // must not also read as a payoff. Krenko's Command says "Goblin" exactly
+    // once, in the token's name, and is a producer only; Krenko, Mob Boss
+    // says it twice — once naming the token, once counting "the number of
+    // Goblins you control" — and that second mention is the payoff.
+    const caringText = facts.text.replace(tokenDescriptorPattern(type), ' ');
+
+    for (const clause of clauses(caringText)) {
+      if (!wordPattern(type).test(clause)) continue;
+      const consumesType = /\bsacrifice\b|\btap\b|\bdiscard\b|\bexile\b/i.test(clause);
+      if (consumesType) {
+        roles.push('consumes');
+        // An activated ability is "cost: effect", so a clause that spends the
+        // type also hands something back. Lathril's "Tap ten untapped Elves
+        // you control: Each opponent loses 10 life" consumes Elves *and*
+        // rewards you for having had them.
+        if (clause.includes(':')) roles.push('rewards');
+      }
+      if (/\bget\b|\bgains?\b|\bhas\b|\bhave\b|whenever|for each|number of|search|\blose\b|\bloses\b/i.test(clause)) {
+        roles.push('rewards');
+      }
+      // Mentioned outside a token's name, in a way none of the above caught —
+      // still active interest in the type, which is what separates Krenko
+      // from Silas Renn.
+      if (!consumesType && !roles.includes('rewards')) roles.push('rewards');
+    }
+
+    if (roles.length === 0) continue;
+    out.push({
+      archetype: 'kindred',
+      label: `${type} Kindred`,
+      description: `${pluralOfType(type)}, and cards that care about having them.`,
+      weight: 15,
+      qualifier: type,
+      qualifierKind: 'creatureType',
+      roles: [...new Set(roles)],
+    });
+  }
+  return out;
+}
+
+/**
+ * Keyword care, one signal per keyword.
+ *
+ * A keyword on its own is not a synergy — Trample is a good thing to have,
+ * not a deck. What matters is a commander that *cares* about the keyword
+ * (grants it, or triggers off it), which is the same active-role test kindred
+ * uses. Having the keyword is `is` and never qualifies a commander on its own.
+ */
+function detectKeywordCare(facts: CardFacts, knownKeywords: string[]): SignalMatch[] {
+  const out: SignalMatch[] = [];
+  for (const keyword of knownKeywords) {
+    if (EXCLUDED_KEYWORDS.has(keyword.toLowerCase())) continue;
+    const roles: Role[] = [];
+    if (facts.keywords.includes(keyword)) roles.push('is');
+    const pattern = new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'i');
+    for (const clause of clauses(facts.text)) {
+      if (!pattern.test(clause)) continue;
+      // "Creatures you control gain trample" / "have flying" — granting it to
+      // others, which is the Craterhoof shape.
+      if (/\b(?:gains?|have|has|gets?)\b/i.test(clause)) roles.push('produces');
+      if (/whenever|for each|number of/i.test(clause)) roles.push('rewards');
+    }
+    if (roles.length === 0) continue;
+    out.push({
+      archetype: 'keywordCare',
+      label: keyword,
+      description: `Cards with ${keyword}, where the commander actually cares about it.`,
+      weight: 8,
+      qualifier: keyword,
+      qualifierKind: 'keyword',
+      roles: [...new Set(roles)],
+    });
+  }
+  return out;
+}
+
+/**
+ * Keywords that are structural rather than thematic.
+ *
+ * The Partner family says who can be your commander, not what your deck
+ * wants to do. Surfacing "Partner" as a shared keyword would be a confusing
+ * echo of the dedicated partner/background handling rather than a second,
+ * unrelated signal.
+ */
+const EXCLUDED_KEYWORDS = new Set([
+  'partner',
+  'partner with',
+  'friends forever',
+  'choose a background',
+  "doctor's companion",
+]);
+
+export interface DetectOptions {
+  /** Creature types present in the submitted list. Qualifiers and token types
+   * are scoped to these — a type nobody owns can't support a signal. */
+  creatureTypes: string[];
+  /** Keywords present in the submitted list. */
+  keywords: string[];
+}
+
+/** Every archetype this card participates in, and how. */
+export function detectSignals(facts: CardFacts, options: DetectOptions): SignalMatch[] {
+  const out: SignalMatch[] = [];
+
+  for (const def of ARCHETYPES) {
+    const roles = rolesFor(def, facts);
+    if (roles.length === 0) continue;
+    const qualifier = def.qualifiable ? findQualifier(facts, def, options.creatureTypes) : undefined;
+    out.push({
+      archetype: def.key,
+      label: qualifier ? `${def.label} (${qualifier})` : def.label,
+      description: def.description,
+      weight: def.weight,
+      qualifier,
+      qualifierKind: qualifier ? def.qualifiable : undefined,
+      roles,
+    });
+  }
+
+  out.push(...detectKindred(facts, options.creatureTypes));
+  out.push(...detectKeywordCare(facts, options.keywords));
+  return out;
+}
+
+/**
+ * Whether a card in the list can support a signal the commander showed.
+ *
+ * Unqualified signals accept any card that participates in the archetype at
+ * all. A *qualified* signal additionally requires the supporter to be of that
+ * subtype — this is the Sliver Gravemother rule, and it is the whole reason
+ * qualifiers exist.
+ */
+export function supports(signal: SignalMatch, supporter: SignalMatch[], facts: CardFacts): boolean {
+  const sameArchetype = supporter.filter((s) => s.archetype === signal.archetype);
+  if (sameArchetype.length === 0) return false;
+  if (!signal.qualifier) return true;
+
+  if (signal.qualifierKind === 'creatureType') {
+    return facts.creatureTypes.includes(signal.qualifier) || facts.producedTokenTypes.includes(signal.qualifier);
+  }
+  if (signal.qualifierKind === 'keyword') {
+    return facts.keywords.includes(signal.qualifier);
+  }
+  return sameArchetype.some((s) => s.qualifier === signal.qualifier);
+}
