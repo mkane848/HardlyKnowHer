@@ -430,6 +430,69 @@ server/                Express + TS + better-sqlite3
 
 ## Known risk areas / things to verify
 
+- **The role vocabulary in `signals.ts` is provisional and wants review.**
+  `Role` is currently `is / produces / consumes / rewards / amplifies`. It
+  replaced an earlier "Outlet / Payoff" split that was reported as *not
+  quite right*, and the five roles are an inference drawn from worked
+  examples rather than a model anyone has signed off on. The specific
+  problem with Outlet/Payoff was that real cards almost never separate the
+  two — Lathril's activated ability consumes ten Elves and rewards you in
+  the same breath, and Viscera Seer is a sacrifice outlet whose entire
+  point is the scry it hands back. Splitting `consumes` from `rewards`
+  lets one ability be both, which Outlet/Payoff could not express.
+  Cases known to still sit awkwardly:
+  - **Goblin Sharpshooter** reads as `rewards` on creature-death (it untaps
+    whenever a creature dies), but players describe it as a *sacrifice
+    outlet*, because with any outlet it becomes a machine gun. It enables a
+    loop it does not itself contain, and no current role captures
+    "enables". If a sixth role is ever added, this is the case that
+    justifies it.
+  - **`is` is deliberately not wired into Aristocrats.** A vanilla creature
+    genuinely is sacrifice fodder, but counting it would make every
+    creature deck read as Aristocrats.
+  - **Changelings** are every creature type by rule, but Scryfall's type
+    line says `Creature — Shapeshifter`, so no type-based test will ever
+    see one as a Goblin. Accepted, not special-cased.
+- **Never write oracle text from memory — copy it out of the database.**
+  Scryfall has switched much of its self-referential wording from the card's
+  name to "this creature" / "this land". Two rules were written against
+  recalled text and were wrong on real cards: Goblin Sharpshooter no longer
+  says "Goblin" anywhere (so it is not, as first claimed, an instance of the
+  name bug — Gitrog, Horror of Zhava is), and Arid Mesa reads "Sacrifice this
+  land", not "Sacrifice Arid Mesa", which silently broke self-sacrifice
+  detection and left it with no signals at all. Every string in
+  `test-signals.ts` is now copied verbatim from the imported database. Keep
+  it that way.
+- **Scoring produces large ties.** A real 34-card Goblin list returned 1,504
+  suggestions with ten commanders sharing a score of 46.60, because they all
+  match the same three signals with the same supporting-card counts. Nothing
+  distinguishes them. This is the strongest argument for the score floor
+  above, and possibly for a tie-breaker (mana value? how *deeply* the
+  commander engages, i.e. role count?).
+- **Aristocrats is credited to any creature-token maker.** `produces:
+  create ... creature token` means Krenko, Mob Boss reads as an Aristocrats
+  card. Tokens genuinely are sacrifice fodder, so this is defensible, but it
+  inflates: it fires on most go-wide cards. Worth revisiting if Aristocrats
+  starts showing up on commanders that have nothing to do with it.
+- **The density denominator is every identity-fitting card (choice A).**
+  `scoreCommanders` divides a signal's supporting-card count by *all*
+  distinct castable cards, lands included. The alternative considered and
+  not taken (**choice B**) excludes lands from the denominator, on the
+  reasoning that lands are infrastructure every deck needs in roughly equal
+  measure rather than evidence that a commander fits your list — a Mountain
+  says nothing about fit, whereas a vanilla Goblin genuinely does (it's a
+  body a go-wide commander uses and a spellslinger doesn't). Choice A was
+  kept deliberately, to be revisited once there's real testing to compare
+  against. Note the change is smaller than it sounds: the depth bonus is a
+  flat card count and unaffected by the denominator, so only the breadth
+  term moves. If you switch, expect breadth to rise across the board and
+  the score floor (below) to need recalibrating with it.
+- **There is still no minimum score to be recommended.** A floor of ~5.0
+  was proposed as a starting point — roughly "one signal with 8 or more
+  real cards behind it" on a 100-card list — but deliberately not
+  implemented, because the signal rework changes the score distribution and
+  a floor calibrated against the old numbers would over-prune. Set it after
+  running real lists.
 - **`better-sqlite3` is a native module.** This bit us on the real Render
   deploy: v11 (the original pin) has no prebuilt binary for newer Node
   versions and falls back to compiling from source, which fails outright

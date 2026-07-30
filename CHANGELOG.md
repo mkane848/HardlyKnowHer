@@ -23,6 +23,45 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   JSONL line by line. If Scryfall renames the field again, the failure is now
   an explicit message naming the fields it did find.
 
+### Changed
+
+- **Synergy detection now understands context, not just vocabulary.** A
+  signal used to be one regex applied identically to your card and to the
+  candidate commander, so two cards "synergised" when the same words appeared
+  in both. That measured lexical overlap rather than synergy. Signals are now
+  structured — what object they act on, what event links them, and in what
+  capacity each card participates (it *is* the resource, *produces* it,
+  *consumes* it, *rewards* it, or *amplifies* it). What this changes in
+  practice:
+  - **A commander has to actually care.** Sharing a property is never enough.
+    Being a Frog Horror doesn't make one a Horror commander, and a card's
+    *name* is no longer evidence of anything — Gitrog, Horror of Zhava was
+    matching Horror kindred purely because "Horror" is in its name, while its
+    abilities are entirely about lands. 267 Commander-eligible cards in the
+    current card data have a creature type that reaches their rules text only
+    through their own name.
+  - **Keywords alone are no longer a synergy.** Two cards both having Trample
+    means nothing; a commander that *grants* trample to your team, the way
+    Craterhoof Behemoth does, is the real signal.
+  - **Payoffs restricted to a subtype only count that subtype.** A commander
+    that reanimates Slivers specifically feeds "Reanimator (Sliver)", and the
+    non-Sliver creatures in your graveyard no longer count toward it.
+  - **Cards land in the right archetype.** A fetch land like Arid Mesa
+    supports Lands Matter rather than Aristocrats — it sacrifices itself and
+    triggers no creature-death ability — and Aristocrats now requires
+    creatures rather than any sacrifice at all.
+  - **Token makers count as kindred cards.** Krenko's Command is a Goblin card
+    despite being a Sorcery with no creature type of its own.
+  - **Reminder text no longer creates signals.** It restates a keyword the
+    card already has and is never an ability of its own — Sliver
+    Gravemother's Encore reminder text ends "They gain haste", which read as
+    the card granting haste to your whole team.
+- New archetypes: Reanimator, Self-Mill, Mill (Opponents), Voltron, Go-Wide
+  Combat, and Lands Matter. Self-mill and opponent-mill are deliberately
+  separate — one is setup, the other is an attack. The loose `graveyard`,
+  `artifact` and `enchantment` themes are gone; they matched removal and
+  hate as readily as the synergy.
+
 ## [1.5.0] — 2026-07-28
 
 ### Fixed
