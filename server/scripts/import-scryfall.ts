@@ -5,17 +5,18 @@ import { frontFaceCharacteristics, isCommanderEligible } from '../src/services/e
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
-const DEFAULT_INPUT = path.join(DATA_DIR, 'oracle-cards.json');
+const DEFAULT_INPUT = path.join(DATA_DIR, 'oracle-cards.jsonl');
 
 const inputPath = process.argv[2] ? path.resolve(process.argv[2]) : DEFAULT_INPUT;
 
 if (!fs.existsSync(inputPath)) {
   console.error(`\nCould not find a Scryfall bulk data file at:\n  ${inputPath}\n`);
   console.error('To fetch it:');
-  console.error('  1. Go to https://scryfall.com/docs/api/bulk-data');
-  console.error('  2. Download the "Oracle Cards" JSON file (~100-150MB)');
-  console.error(`  3. Save it as: ${DEFAULT_INPUT}`);
-  console.error('     (or pass a custom path: npm run import-scryfall -- /path/to/file.json)\n');
+  console.error('  1. Run: npm run fetch-scryfall');
+  console.error('     (or download "Oracle Cards" by hand from');
+  console.error('      https://scryfall.com/docs/api/bulk-data, gunzip it,');
+  console.error(`      and save it as: ${DEFAULT_INPUT})`);
+  console.error('     (or pass a custom path: npm run import-scryfall -- /path/to/file.jsonl)\n');
   process.exit(1);
 }
 
@@ -25,8 +26,30 @@ if (!fs.existsSync(DATA_DIR)) {
 
 console.log(`Reading ${inputPath} ...`);
 const raw = fs.readFileSync(inputPath, 'utf-8');
+
+// Newline-delimited JSON, one card per line — Scryfall's bulk export is no
+// longer a single JSON array. Tolerates a leading "[" / trailing "]" line so
+// an older hand-downloaded array file still imports rather than dying on
+// line 1.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const cards: any[] = JSON.parse(raw);
+const cards: any[] = [];
+let lineNumber = 0;
+for (const line of raw.split('\n')) {
+  lineNumber++;
+  const trimmed = line.trim().replace(/,$/, '');
+  if (!trimmed || trimmed === '[' || trimmed === ']') continue;
+  try {
+    cards.push(JSON.parse(trimmed));
+  } catch {
+    throw new Error(
+      `Could not parse line ${lineNumber} of ${inputPath} as JSON. Expected newline-delimited JSON ` +
+        `(one card object per line). Line began: ${trimmed.slice(0, 80)}`
+    );
+  }
+}
+if (cards.length === 0) {
+  throw new Error(`${inputPath} contained no card entries.`);
+}
 console.log(`Parsed ${cards.length} card entries.`);
 
 const db = new Database(DB_PATH);
