@@ -35,6 +35,25 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   and build everything, as before. See `docs/card-data-strategy.md`.
 - The About dialog shows when the card data was published, alongside the
   existing app version and build date.
+- **Cited cards show their real mana cost**, as symbols, instead of "MV 3" —
+  the pips carry the card's colors as well as its cost, which the number
+  didn't. Each list is now ordered by mana value and then alphabetically, the
+  way a decklist reads; cards with no mana value (lands) sort last rather
+  than as zero.
+- Results-per-page options are **12 / 24 / 48 / 96**, replacing 9 / 18 / 36 /
+  72. All of them still fill whole rows of the grid, and the new set does so
+  at four columns as well as three, so wide screens no longer end on a ragged
+  row. An existing saved preference moves to the nearest new option rather
+  than resetting.
+
+### Added
+
+- **A Clear button for the card list**, behind a confirmation step, since
+  nothing is saved and a mis-click would mean pasting the list again. It only
+  appears when there is something to clear.
+- **Type a page number** to jump straight to it, alongside the numbered
+  buttons. Only shown once there are enough pages that the numbers start
+  collapsing behind an ellipsis.
 
 ## [1.6.0] — 2026-07-30
 

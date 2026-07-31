@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import * as HoverCard from '@radix-ui/react-hover-card';
 import { ComboFinder } from './ComboFinder';
 import { CardDetailDialog } from './CardDetailDialog';
@@ -7,6 +7,7 @@ import { useAppStore } from '../store/useAppStore';
 import { identityName, sortWubrg } from '../lib/mtg';
 import { visibleKeywordSupport, visibleThemeSupport, visibleKindredSupport } from '../lib/suggestions';
 import { ManaSymbol } from './ManaSymbol';
+import { ManaCost } from './ManaCost';
 import type { BracketEstimateDTO, CommanderCardDTO, CommanderSuggestionDTO, SupportingCardDTO } from '../types';
 
 function cardCount(cards: SupportingCardDTO[]): number {
@@ -63,16 +64,34 @@ function SupportingCardName({ card }: { card: SupportingCardDTO }) {
 }
 
 function SupportingCardList({ cards }: { cards: SupportingCardDTO[] }) {
+  // Curve order, the way a decklist is read: cheapest first, ties alphabetical.
+  // Cards without a mana value — lands, mostly — sort last rather than as
+  // zero, since a land is not a one-drop.
+  const ordered = useMemo(
+    () =>
+      [...cards].sort((a, b) => {
+        const aValue = a.manaValue ?? Number.POSITIVE_INFINITY;
+        const bValue = b.manaValue ?? Number.POSITIVE_INFINITY;
+        if (aValue !== bValue) return aValue - bValue;
+        return a.name.localeCompare(b.name);
+      }),
+    [cards]
+  );
+
   return (
     <ul className="support-cards">
-      {cards.map((card) => (
+      {ordered.map((card) => (
         <li key={card.name} className="support-card">
           {card.quantity > 1 && <span className="support-qty">{card.quantity}×</span>}
           <SupportingCardName card={card} />
-          {/* Truncates alongside the name under CSS rather than being hidden
-              by a width measurement — simpler, and it degrades the same way
-              a long name itself does when the row is tight. */}
-          {card.manaValue !== null && <span className="support-mv">MV {card.manaValue}</span>}
+          {/* The printed cost, not "MV 3" — pips are what a player reads, and
+              they carry the colors as well as the number. Falls back to
+              nothing for lands and anything else without a cost. */}
+          {card.manaCost && (
+            <span className="support-cost">
+              <ManaCost cost={card.manaCost} />
+            </span>
+          )}
           {card.isGameChanger && (
             <span className="support-gc" title="On the Game Changers list">
               GC

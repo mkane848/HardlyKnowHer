@@ -46,6 +46,10 @@ export interface SupportingCard {
   typeLine: string | null;
   isGameChanger: boolean;
   manaValue: number | null;
+  /** Printed cost, e.g. "{2}{B}{B}". Null for lands and anything without
+   * one. Carried alongside manaValue because the two answer different
+   * questions: manaValue sorts, manaCost is what a player reads. */
+  manaCost: string | null;
   imageUri: string | null;
   backImageUri: string | null;
   backName: string | null;
@@ -103,6 +107,7 @@ function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
     typeLine: row.type_line,
     isGameChanger: !!row.game_changer,
     manaValue: row.cmc,
+    manaCost: row.mana_cost,
     imageUri: row.image_uri,
     backImageUri: row.back_image_uri ?? null,
     backName: row.back_name ?? null,

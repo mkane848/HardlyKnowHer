@@ -11,6 +11,8 @@ export interface SupportingCardDTO {
   typeLine: string | null;
   isGameChanger: boolean;
   manaValue: number | null;
+  /** Printed cost, e.g. "{2}{B}{B}". Null for lands and anything without one. */
+  manaCost: string | null;
   imageUri: string | null;
   /** Second face of a transform/modal DFC, for the art preview's flip control. */
   backImageUri: string | null;
