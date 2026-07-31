@@ -14,6 +14,7 @@ import assert from 'node:assert';
 import type { CardRow } from '../src/types';
 import {
   buildCardFacts,
+  buildVocabulary,
   detectSignals,
   hasActiveRole,
   stripSelfReferences,
@@ -65,9 +66,10 @@ function makeCard(overrides: Partial<CardRow> = {}): CardRow {
   };
 }
 
-/** Detect against a list that contains these creature types / keywords. */
+/** Detect against a vocabulary containing these creature types / keywords. */
 function signalsFor(row: CardRow, creatureTypes: string[] = [], keywords: string[] = []): SignalMatch[] {
-  return detectSignals(buildCardFacts(row, creatureTypes), { creatureTypes, keywords });
+  const vocab = buildVocabulary(creatureTypes, keywords);
+  return detectSignals(buildCardFacts(row, vocab), vocab);
 }
 
 function find(signals: SignalMatch[], archetype: string, qualifier?: string): SignalMatch | undefined {

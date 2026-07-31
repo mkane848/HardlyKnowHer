@@ -3,6 +3,8 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { frontFaceCharacteristics, isCommanderEligible } from '../src/services/eligibility';
 import { faceNameEntries } from '../src/services/cardNames';
+import { buildCardFacts, buildVocabulary, detectSignals } from '../src/services/signals';
+import type { CardRow } from '../src/types';
 import { IMPORT_VERSION, readSidecar } from '../src/services/dataSnapshot';
 import { readImportedSnapshot, writeImportedSnapshot } from '../src/services/importedSnapshot';
 
@@ -167,6 +169,31 @@ db.exec(`
     oracle_id TEXT NOT NULL
   );
   CREATE INDEX idx_flavor_names_lower ON card_flavor_names(flavor_name_lower);
+
+  -- Every archetype each card participates in, and in what capacity. This is
+  -- the shared relationship layer: precomputed once here so that anything
+  -- wanting to reason about cards -- the commander scorer, deck-theme
+  -- summaries, "what's missing from this package" -- queries the same rows
+  -- rather than each re-deriving them.
+  --
+  -- Computing it at import also makes it *more* correct, not just faster.
+  -- Detecting at request time could only ever look for the vocabulary present
+  -- in the submitted list; here every creature type and keyword in the game is
+  -- in scope, so a card's relationships are a property of the card rather than
+  -- of whatever someone happened to paste.
+  DROP TABLE IF EXISTS card_signals;
+  CREATE TABLE card_signals (
+    oracle_id TEXT NOT NULL,
+    archetype TEXT NOT NULL,
+    -- Set for kindred and keyword-care, which exist once per creature type or
+    -- keyword, and for subtype-restricted payoffs like Reanimator (Sliver).
+    qualifier TEXT,
+    qualifier_kind TEXT,
+    -- JSON array of roles: is / produces / consumes / rewards / amplifies.
+    roles TEXT NOT NULL
+  );
+  CREATE INDEX idx_card_signals_oracle ON card_signals(oracle_id);
+  CREATE INDEX idx_card_signals_archetype ON card_signals(archetype, qualifier);
 `);
 
 function parseCreatureTypes(typeLine: string): string[] {
@@ -341,6 +368,48 @@ console.log(`${banned.c} cards are currently banned in Commander.`);
 console.log(`${gameChangers.c} cards are on the Game Changers list.`);
 const faceNames = db.prepare('SELECT COUNT(*) as c FROM card_face_names').get() as { c: number };
 console.log(`${faceNames.c} face names indexed for single-side matching.`);
+
+// --- signals -----------------------------------------------------------
+//
+// Done after the cards are in, so the vocabulary is every creature type and
+// keyword the database actually contains rather than a hand-maintained list.
+{
+  const cardRows = db.prepare('SELECT * FROM cards').all() as CardRow[];
+  const creatureTypes = new Set<string>();
+  const keywords = new Set<string>();
+  for (const row of cardRows) {
+    for (const type of JSON.parse(row.creature_types || '[]') as string[]) creatureTypes.add(type);
+    for (const keyword of JSON.parse(row.keywords || '[]') as string[]) keywords.add(keyword);
+  }
+  const vocabulary = buildVocabulary([...creatureTypes], [...keywords]);
+
+  const insertSignal = db.prepare(
+    `INSERT INTO card_signals (oracle_id, archetype, qualifier, qualifier_kind, roles)
+     VALUES (?, ?, ?, ?, ?)`
+  );
+  let signalCount = 0;
+  db.transaction(() => {
+    for (const row of cardRows) {
+      for (const signal of detectSignals(buildCardFacts(row, vocabulary), vocabulary)) {
+        insertSignal.run(
+          row.oracle_id,
+          signal.archetype,
+          signal.qualifier ?? null,
+          signal.qualifierKind ?? null,
+          JSON.stringify(signal.roles)
+        );
+        signalCount++;
+      }
+    }
+  })();
+  const withSignals = db
+    .prepare('SELECT COUNT(DISTINCT oracle_id) as c FROM card_signals')
+    .get() as { c: number };
+  console.log(
+    `${signalCount} card signals precomputed across ${withSignals.c} cards ` +
+      `(vocabulary: ${creatureTypes.size} creature types, ${keywords.size} keywords).`
+  );
+}
 
 // Re-skinned names, from the companion file fetch-scryfall.ts writes. Absent
 // when the fetch was skipped or predates that file — an older local database

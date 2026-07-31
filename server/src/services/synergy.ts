@@ -10,12 +10,14 @@ import type { CardRow } from '../types';
 import type { CommanderUnit } from './partners';
 import {
   buildCardFacts,
+  buildVocabulary,
   detectSignals,
   hasActiveRole,
   signalKey,
   type CardFacts,
   type Role,
   type SignalMatch,
+  type Vocabulary,
 } from './signals';
 
 export interface OwnedCard {
@@ -30,6 +32,9 @@ export interface CollectionProfile {
    * anything, and scoping keeps the per-candidate work small. */
   creatureTypes: string[];
   keywords: string[];
+  /** Lookup tables built once from the two lists above, so signal detection
+   * costs one map lookup per word rather than a regex per type in Magic. */
+  vocabulary: Vocabulary;
   /** Cards participating in each archetype, in any role. Indexed by archetype
    * rather than by full signal key so a qualified commander signal can filter
    * a small bucket instead of rescanning the list. */
@@ -140,11 +145,13 @@ export function buildCollectionProfile(owned: OwnedCard[]): CollectionProfile {
   const archetypeCards: Record<string, OwnedCard[]> = {};
   const factsByCard = new Map<string, CardFacts>();
 
+  const vocabulary = buildVocabulary(creatureTypes, keywords);
+
   for (const entry of owned) {
-    const facts = buildCardFacts(entry.row, creatureTypes);
+    const facts = buildCardFacts(entry.row, vocabulary);
     factsByCard.set(entry.row.oracle_id, facts);
     const seen = new Set<string>();
-    for (const signal of detectSignals(facts, { creatureTypes, keywords })) {
+    for (const signal of detectSignals(facts, vocabulary)) {
       // One bucket entry per archetype, even if a card matches it at several
       // qualifiers — the bucket is a candidate set, not a count.
       if (seen.has(signal.archetype)) continue;
@@ -153,7 +160,7 @@ export function buildCollectionProfile(owned: OwnedCard[]): CollectionProfile {
     }
   }
 
-  return { colorCounts, creatureTypes, keywords, archetypeCards, factsByCard, totalCards };
+  return { colorCounts, creatureTypes, keywords, vocabulary, archetypeCards, factsByCard, totalCards };
 }
 
 // A commander unit is jointly "the commander" (702.124e), so signals are
@@ -171,11 +178,8 @@ function unitColorIdentity(unit: CommanderUnit): Set<string> {
 function unitSignals(unit: CommanderUnit, profile: CollectionProfile): SignalMatch[] {
   const merged = new Map<string, SignalMatch>();
   for (const card of unit.cards) {
-    const facts = buildCardFacts(card, profile.creatureTypes);
-    for (const signal of detectSignals(facts, {
-      creatureTypes: profile.creatureTypes,
-      keywords: profile.keywords,
-    })) {
+    const facts = buildCardFacts(card, profile.vocabulary);
+    for (const signal of detectSignals(facts, profile.vocabulary)) {
       const key = signalKey(signal);
       const existing = merged.get(key);
       if (existing) {

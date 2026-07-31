@@ -26,6 +26,17 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ### Changed
 
+- **Card relationships are now computed once, at import, and shared.** Which
+  archetypes a card belongs to — and in what capacity — used to be derived
+  on the fly, per request, scoped to whatever vocabulary the submitted list
+  happened to contain. They are now precomputed into a `card_signals` table
+  covering every creature type and keyword in the game, so a card's
+  relationships are a property of the card rather than of what someone pasted.
+  Nothing in the recommendations changes yet; this is the foundation the
+  deck-theme summary and card-package suggestions are built on, and it makes
+  questions like "which cards *produce* Goblins" or "which cards *reward*
+  creature death" answerable directly instead of only as a side effect of
+  scoring commanders.
 - **The card data refresh only does work when there's new data.** Re-running
   it now compares against the published snapshot instead of guessing from the
   file's age — the old rule reused a week-old copy after Scryfall had

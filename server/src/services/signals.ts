@@ -186,23 +186,62 @@ function parseJsonArray(value: string | null): string[] {
   }
 }
 
+/** Every word in a piece of text, lowercased. The unit of vocabulary
+ * lookup — see `candidateTypes` for why looking up beats searching. */
+function wordsIn(text: string): string[] {
+  return text.toLowerCase().match(/[a-z][a-z'-]*/g) ?? [];
+}
+
 /**
  * Creature types of tokens this card creates.
  *
- * Scoped to `knownTypes` — the creature types actually present in the
- * submitted list — rather than trying to carry Magic's full type list around.
- * A token type nobody owns cannot support a signal anyway, so nothing is lost.
+ * Read out of each "create ... token" clause, so a type mentioned elsewhere
+ * in an unrelated sentence isn't credited as a token type.
  */
-function findProducedTokenTypes(text: string, knownTypes: string[]): string[] {
+function findProducedTokenTypes(text: string, vocab: Vocabulary): string[] {
   const found = new Set<string>();
-  // Each "create ... token" clause, so a type mentioned elsewhere in an
-  // unrelated sentence isn't credited as a token type.
   for (const clause of text.match(/create[^.;]*token[^.;]*/gi) ?? []) {
-    for (const type of knownTypes) {
-      if (wordPattern(type).test(clause)) found.add(type);
+    for (const word of wordsIn(clause)) {
+      const type = vocab.typeByWord.get(word);
+      if (type) found.add(type);
     }
   }
   return [...found];
+}
+
+/**
+ * Lookup tables for the vocabulary signal detection recognises.
+ *
+ * Built once and reused across every card. The point is direction: with a
+ * map, recognising a card's types costs one lookup per word it contains;
+ * without one, it cost a regex per type in Magic. Across the card pool that
+ * was the difference between ~8 seconds and ~82.
+ */
+export interface Vocabulary {
+  /** Lowercased word, singular or plural, to its canonical creature type:
+   * "elves" and "elf" both map to "Elf". */
+  typeByWord: Map<string, string>;
+  /** Lowercased single-word keyword to its canonical form. */
+  keywordByWord: Map<string, string>;
+  /** Keywords containing a space, which single-word lookup cannot find. */
+  multiWordKeywords: string[];
+}
+
+export function buildVocabulary(creatureTypes: string[], keywords: string[]): Vocabulary {
+  const typeByWord = new Map<string, string>();
+  for (const type of creatureTypes) {
+    typeByWord.set(type.toLowerCase(), type);
+    typeByWord.set(pluralOfType(type).toLowerCase(), type);
+  }
+
+  const keywordByWord = new Map<string, string>();
+  const multiWordKeywords: string[] = [];
+  for (const keyword of keywords) {
+    if (keyword.includes(' ')) multiWordKeywords.push(keyword);
+    else keywordByWord.set(keyword.toLowerCase(), keyword);
+  }
+
+  return { typeByWord, keywordByWord, multiWordKeywords };
 }
 
 const wordPatternCache = new Map<string, RegExp>();
@@ -283,7 +322,7 @@ function stripReminderText(text: string): string {
   return text.replace(/\([^)]*\)/g, ' ');
 }
 
-export function buildCardFacts(row: CardRow, knownTypes: string[]): CardFacts {
+export function buildCardFacts(row: CardRow, vocab: Vocabulary): CardFacts {
   const rawText = row.oracle_text ?? '';
   const text = stripReminderText(stripSelfReferences(rawText, row.name, row.back_name ?? null));
   const typeLine = row.type_line ?? '';
@@ -294,7 +333,7 @@ export function buildCardFacts(row: CardRow, knownTypes: string[]): CardFacts {
     rawText,
     creatureTypes: parseJsonArray(row.creature_types),
     keywords: parseJsonArray(row.keywords),
-    producedTokenTypes: findProducedTokenTypes(text, knownTypes),
+    producedTokenTypes: findProducedTokenTypes(text, vocab),
     sacrificesItself: detectsSelfSacrifice(rawText, row.name),
     isLand: /\bLand\b/.test(typeLine),
     isCreature: /\bCreature\b/.test(typeLine),
@@ -521,13 +560,14 @@ function clauses(text: string): string[] {
  * that reanimates anything and separately happens to mention Goblins is not a
  * Goblin-restricted reanimator.
  */
-function findQualifier(facts: CardFacts, def: ArchetypeDef, knownTypes: string[]): string | undefined {
+function findQualifier(facts: CardFacts, def: ArchetypeDef, vocab: Vocabulary): string | undefined {
   const payoffMatchers = [...(def.roles.rewards ?? []), ...(def.roles.consumes ?? [])];
   for (const clause of clauses(facts.text)) {
     const hit = payoffMatchers.some((m) => (typeof m === 'function' ? false : m.test(clause)));
     if (!hit) continue;
-    for (const type of knownTypes) {
-      if (wordPattern(type).test(clause)) return type;
+    for (const word of wordsIn(clause)) {
+      const type = vocab.typeByWord.get(word);
+      if (type) return type;
     }
   }
   return undefined;
@@ -542,11 +582,34 @@ function rolesFor(def: ArchetypeDef, facts: CardFacts): Role[] {
   return found;
 }
 
+/**
+ * The creature types a card could possibly relate to.
+ *
+ * Derived from the card outward rather than by testing every type in the
+ * game against it. That is not just an optimisation: looping the full
+ * vocabulary meant 647 types x 884 keywords of regex per card, which took
+ * 82 seconds across the card pool and made precomputing signals impractical.
+ * Scanning the card's own words and intersecting with the known-type set is
+ * proportional to the card, not to Magic's type list.
+ */
+function candidateTypes(facts: CardFacts, vocab: Vocabulary): string[] {
+  const found = new Set<string>();
+  // Structured, and free.
+  for (const type of facts.creatureTypes) found.add(type);
+  for (const type of facts.producedTokenTypes) found.add(type);
+  // Textual: every word the card uses, looked up rather than searched for.
+  for (const word of wordsIn(facts.text)) {
+    const type = vocab.typeByWord.get(word);
+    if (type) found.add(type);
+  }
+  return [...found];
+}
+
 /** Kindred, one signal per creature type. Membership is structural (the card's
  * own type, or a token type it makes); caring about the type is textual. */
-function detectKindred(facts: CardFacts, knownTypes: string[]): SignalMatch[] {
+function detectKindred(facts: CardFacts, vocab: Vocabulary): SignalMatch[] {
   const out: SignalMatch[] = [];
-  for (const type of knownTypes) {
+  for (const type of candidateTypes(facts, vocab)) {
     const roles: Role[] = [];
     // Structured data only — never the name. Goblin Sharpshooter is a Goblin
     // because its type line says so.
@@ -605,9 +668,9 @@ function detectKindred(facts: CardFacts, knownTypes: string[]): SignalMatch[] {
  * (grants it, or triggers off it), which is the same active-role test kindred
  * uses. Having the keyword is `is` and never qualifies a commander on its own.
  */
-function detectKeywordCare(facts: CardFacts, knownKeywords: string[]): SignalMatch[] {
+function detectKeywordCare(facts: CardFacts, vocab: Vocabulary): SignalMatch[] {
   const out: SignalMatch[] = [];
-  for (const keyword of knownKeywords) {
+  for (const keyword of candidateKeywords(facts, vocab)) {
     if (EXCLUDED_KEYWORDS.has(keyword.toLowerCase())) continue;
     const roles: Role[] = [];
     if (facts.keywords.includes(keyword)) roles.push('is');
@@ -649,22 +712,32 @@ const EXCLUDED_KEYWORDS = new Set([
   "doctor's companion",
 ]);
 
-export interface DetectOptions {
-  /** Creature types present in the submitted list. Qualifiers and token types
-   * are scoped to these — a type nobody owns can't support a signal. */
-  creatureTypes: string[];
-  /** Keywords present in the submitted list. */
-  keywords: string[];
+/** The keywords a card could possibly relate to. Same inversion as
+ * `candidateTypes` — look up the card's own words instead of testing all 884
+ * keywords against it. Multi-word keywords ("first strike") can't be found by
+ * single-word lookup, so those few are still tested directly. */
+function candidateKeywords(facts: CardFacts, vocab: Vocabulary): string[] {
+  const found = new Set<string>();
+  for (const keyword of facts.keywords) found.add(keyword);
+  for (const word of wordsIn(facts.text)) {
+    const keyword = vocab.keywordByWord.get(word);
+    if (keyword) found.add(keyword);
+  }
+  const lowerText = facts.text.toLowerCase();
+  for (const keyword of vocab.multiWordKeywords) {
+    if (lowerText.includes(keyword.toLowerCase())) found.add(keyword);
+  }
+  return [...found];
 }
 
 /** Every archetype this card participates in, and how. */
-export function detectSignals(facts: CardFacts, options: DetectOptions): SignalMatch[] {
+export function detectSignals(facts: CardFacts, vocab: Vocabulary): SignalMatch[] {
   const out: SignalMatch[] = [];
 
   for (const def of ARCHETYPES) {
     const roles = rolesFor(def, facts);
     if (roles.length === 0) continue;
-    const qualifier = def.qualifiable ? findQualifier(facts, def, options.creatureTypes) : undefined;
+    const qualifier = def.qualifiable ? findQualifier(facts, def, vocab) : undefined;
     out.push({
       archetype: def.key,
       label: qualifier ? `${def.label} (${qualifier})` : def.label,
@@ -676,8 +749,8 @@ export function detectSignals(facts: CardFacts, options: DetectOptions): SignalM
     });
   }
 
-  out.push(...detectKindred(facts, options.creatureTypes));
-  out.push(...detectKeywordCare(facts, options.keywords));
+  out.push(...detectKindred(facts, vocab));
+  out.push(...detectKeywordCare(facts, vocab));
   return out;
 }
 
