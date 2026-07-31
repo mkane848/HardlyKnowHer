@@ -45,6 +45,17 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   at four columns as well as three, so wide screens no longer end on a ragged
   row. An existing saved preference moves to the nearest new option rather
   than resetting.
+- **Far fewer, better results.** A commander whose entire case was one
+  archetype matched on the bare minimum of three cards is a coincidence, not
+  a recommendation — and there are hundreds of them for any given list. A
+  suggestion now has to show either a signal with five or more of your cards
+  behind it, or more than one signal at all. On a focused kindred list that
+  cut results from 1,400 to 768 while leaving every real match in place; on
+  a list with no strong pattern it cut 877 near-identical suggestions to a
+  short, clearly-labelled shortlist. This is a quality bar, not a cap: a list
+  with genuine depth still gets everything that fits it.
+- When nothing clears that bar, the results now **say so** rather than
+  presenting the closest few as a confident ranking.
 
 ### Added
 

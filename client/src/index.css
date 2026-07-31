@@ -1835,3 +1835,18 @@ summary.explain-group-title::after {
   outline: 2px solid var(--brass);
   outline-offset: 2px;
 }
+
+/* Shown above results when nothing cleared the quality bar. Bordered rather
+   than coloured like an error — the request succeeded, the answer is just
+   less confident than usual. */
+.weak-match-note {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  background: var(--ink-raised);
+  border: 1px solid var(--ink-border);
+  border-left: 3px solid var(--brass);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin: 0 0 1.25rem;
+}

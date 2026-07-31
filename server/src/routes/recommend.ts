@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { isSeeded, findCardsByNames, getCommanderCandidates, getBackgroundCards } from '../db';
 import { parseCardList } from '../services/parseList';
-import { buildCollectionProfile, scoreCommanders, type OwnedCard } from '../services/synergy';
+import {
+  buildCollectionProfile,
+  scoreCommanders,
+  selectSuggestions,
+  type OwnedCard,
+} from '../services/synergy';
 import { buildCommanderUnits, unitKey } from '../services/partners';
 import { estimateBracket } from '../services/bracket';
 import { applySingletonLimits } from '../services/singleton';
@@ -58,13 +63,16 @@ router.post('/recommend', (req, res) => {
   const candidates = getCommanderCandidates();
   const backgrounds = getBackgroundCards();
   const units = buildCommanderUnits(candidates, backgrounds);
-  // Every suggestion that cleared scoreCommanders' own bar (identity fit +
-  // at least one real signal) is returned — no further slicing. The client
-  // owns pagination over the full set, since it also needs the whole thing
-  // for the filter bar's counts and options.
+  // Two bars, not one. scoreCommanders drops anything with no identity fit
+  // or no real signal; selectSuggestions then drops the long tail whose
+  // whole case is a single bare-minimum signal, which is what made result
+  // counts run into four figures. Still no cap beyond that — the client
+  // owns pagination over whatever survives, since it needs the full set for
+  // the filter bar's counts and options anyway.
   const scored = scoreCommanders(units, profile, owned);
+  const { suggestions: selected, weakMatchesOnly } = selectSuggestions(scored);
 
-  const suggestions = scored.map((s) => {
+  const suggestions = selected.map((s) => {
     // Every card in the unit counts toward the Bracket, alongside any Game
     // Changers in the list that fit its color identity — a Partner pair is
     // jointly "the commander" (702.124e), so both halves' own status matters.
@@ -116,6 +124,10 @@ router.post('/recommend', (req, res) => {
     totalMatched: owned.reduce((sum, c) => sum + c.quantity, 0),
     ignoredCopies,
     notFound,
+    // True when no commander showed a real pattern and these are just the
+    // closest few. The client says so rather than presenting them as
+    // confident recommendations.
+    weakMatchesOnly,
     suggestions,
   });
 });

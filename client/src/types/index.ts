@@ -97,6 +97,9 @@ export interface RecommendResponse {
   /** Copies dropped because Commander is singleton — see services/singleton.ts. */
   ignoredCopies: number;
   notFound: string[];
+  /** True when no commander showed a real pattern, so `suggestions` is just
+   * the closest few rather than a confident ranking. */
+  weakMatchesOnly: boolean;
   suggestions: CommanderSuggestionDTO[];
 }
 

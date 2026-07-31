@@ -136,6 +136,16 @@ export function RecommendationResults() {
 
   return (
     <section className="results">
+      {/* Said before the results, not after: these are the closest few rather
+          than a ranking, and presenting them silently would imply a
+          confidence the scoring never had. */}
+      {result.weakMatchesOnly && result.suggestions.length > 0 && (
+        <p className="weak-match-note">
+          No commander matched this list strongly — nothing turned up a deep synergy or more than one shared
+          theme. These are the closest few; treat them as a starting point rather than a ranking. Adding more
+          cards that pull in the same direction will sharpen this.
+        </p>
+      )}
       <div className="results-summary">
         <span>
           {result.totalMatched} of {result.totalParsed} cards matched
