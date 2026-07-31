@@ -97,3 +97,12 @@ export interface RecommendResponse {
   notFound: string[];
   suggestions: CommanderSuggestionDTO[];
 }
+
+/** Server-side facts about the deployment itself, from /api/meta. */
+export interface ServerMeta {
+  /** Scryfall's publish time for the bulk snapshot the card database was
+   * built from. Null when the database predates snapshot tracking. */
+  cardDataUpdatedAt: string | null;
+  /** When that import ran. Null for the same reason. */
+  importedAt: string | null;
+}

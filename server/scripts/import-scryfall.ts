@@ -3,12 +3,18 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { frontFaceCharacteristics, isCommanderEligible } from '../src/services/eligibility';
 import { faceNameEntries } from '../src/services/cardNames';
+import { IMPORT_VERSION, readSidecar } from '../src/services/dataSnapshot';
+import { readImportedSnapshot, writeImportedSnapshot } from '../src/services/importedSnapshot';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
 const DEFAULT_INPUT = path.join(DATA_DIR, 'oracle-cards.jsonl');
 
-const inputPath = process.argv[2] ? path.resolve(process.argv[2]) : DEFAULT_INPUT;
+// Flags are filtered out before looking for the optional input path —
+// otherwise `import-scryfall --force` reads "--force" as the filename and
+// fails with a baffling "could not find /path/to/--force".
+const positionalArgs = process.argv.slice(2).filter((arg) => !arg.startsWith('-'));
+const inputPath = positionalArgs[0] ? path.resolve(positionalArgs[0]) : DEFAULT_INPUT;
 
 if (!fs.existsSync(inputPath)) {
   console.error(`\nCould not find a Scryfall bulk data file at:\n  ${inputPath}\n`);
@@ -23,6 +29,31 @@ if (!fs.existsSync(inputPath)) {
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Can this import be skipped entirely?
+//
+// Two things must both match: the data (which snapshot the database was
+// built from) and the code (IMPORT_VERSION). Checking only the data would
+// mean editing an import rule, re-running, and silently keeping the old
+// database — a change that looks applied and isn't.
+const forceImport = process.argv.includes('--force');
+const diskSnapshot = readSidecar(inputPath);
+
+if (!forceImport && diskSnapshot && fs.existsSync(DB_PATH)) {
+  const existing = readImportedSnapshot(DB_PATH);
+  if (
+    existing &&
+    existing.updatedAt === diskSnapshot.updatedAt &&
+    existing.importVersion === IMPORT_VERSION
+  ) {
+    console.log(
+      `Database is already built from this snapshot (published ${existing.updatedAt}, ` +
+        `import v${existing.importVersion}). Nothing to do.\n` +
+        'Pass --force to rebuild it anyway.'
+    );
+    process.exit(0);
+  }
 }
 
 console.log(`Reading ${inputPath} ...`);
@@ -361,5 +392,21 @@ const backgroundCount = db.prepare('SELECT COUNT(*) as c FROM cards WHERE is_bac
   c: number;
 };
 console.log(`${backgroundCount.c} legendary Background enchantments found.`);
+
+// Last, and only on the success path: a meta row written before the import
+// finished would let a half-built database claim to be current, and the next
+// run would skip rebuilding it.
+if (diskSnapshot) {
+  writeImportedSnapshot(db, {
+    updatedAt: diskSnapshot.updatedAt,
+    importVersion: IMPORT_VERSION,
+  });
+  console.log(`Recorded snapshot ${diskSnapshot.updatedAt} (import v${IMPORT_VERSION}).`);
+} else {
+  // No sidecar — a hand-placed file, or one downloaded before sidecars
+  // existed. Leaving meta unwritten means the next run re-imports rather
+  // than trusting a snapshot nobody can identify.
+  console.log('No snapshot metadata alongside the input file; not recording one.');
+}
 
 db.close();

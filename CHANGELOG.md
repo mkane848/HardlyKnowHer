@@ -9,6 +9,33 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cards written down the way people actually write them now match.** A card
+  stored as "Adventurous Eater // Have a Bite" was only findable by that full
+  joined name. Single-face matching existed but covered just two layouts, so
+  384 gameplay cards were unfindable by the name printed on them — adventure
+  (166), split (137), prepare (55), and flip (26). Typing "Adventurous Eater"
+  or "Gollum, Silent Slinker" now resolves. Cards whose face name is also a
+  real card in its own right — "Lightning Bolt" is both a card and the back
+  face of another — still resolve to the standalone card.
+- **Re-skinned printings match.** "Count Dracula" is Sorin the Mirthless, and
+  "You're Gonna Need a Bigger Boat" is Abrade. These alternate names live on
+  the printing rather than the card, so the bulk data has none of them; 602 of
+  them, covering 428 cards, are now indexed.
+
+### Changed
+
+- **The card data refresh only does work when there's new data.** Re-running
+  it now compares against the published snapshot instead of guessing from the
+  file's age — the old rule reused a week-old copy after Scryfall had
+  published something newer, and re-downloaded 24 MB of unchanged data. A
+  no-op refresh went from ~12 seconds and a 24 MB download to ~2 seconds and
+  almost nothing. Deploys are unaffected: they start from an empty directory
+  and build everything, as before. See `docs/card-data-strategy.md`.
+- The About dialog shows when the card data was published, alongside the
+  existing app version and build date.
+
 ## [1.6.0] — 2026-07-30
 
 ### Fixed

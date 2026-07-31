@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchCombos, fetchRecommendations } from './client';
+import { fetchCombos, fetchMeta, fetchRecommendations } from './client';
 
 /**
  * Recommendations for a submitted list.
@@ -35,5 +35,21 @@ export function useCombos(commanderNames: string[], submittedList: string, enabl
     queryKey: ['combos', [...commanderNames].sort(), submittedList],
     queryFn: () => fetchCombos(submittedList, commanderNames),
     enabled,
+  });
+}
+
+/**
+ * How current the server's card data is, for the About dialog.
+ *
+ * Long staleness window because it changes at most once a day, and no retry:
+ * an unreachable server should leave the line blank rather than make the
+ * dialog wait.
+ */
+export function useServerMeta() {
+  return useQuery({
+    queryKey: ['server-meta'],
+    queryFn: fetchMeta,
+    staleTime: 60 * 60 * 1000,
+    retry: false,
   });
 }

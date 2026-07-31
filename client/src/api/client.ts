@@ -1,4 +1,4 @@
-import type { ComboLookupResponse, RecommendResponse } from '../types';
+import type { ComboLookupResponse, RecommendResponse, ServerMeta } from '../types';
 
 // In dev, this is left empty and Vite's proxy forwards /api to localhost:4000
 // (see vite.config.ts). In production, set VITE_API_URL to your deployed
@@ -76,6 +76,19 @@ export function wakeServer(): void {
 
 export function fetchRecommendations(rawList: string): Promise<RecommendResponse> {
   return postJson<RecommendResponse>('/api/recommend', { list: rawList });
+}
+
+/**
+ * How current the server's card data is.
+ *
+ * A plain fetch with no wake-up retry: this only feeds a line in the About
+ * dialog, so a sleeping server should leave that line blank rather than hold
+ * a modal open for a minute. Callers treat a rejection as "unknown".
+ */
+export async function fetchMeta(): Promise<ServerMeta> {
+  const response = await fetch(`${API_BASE}/api/meta`);
+  if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
+  return (await response.json()) as ServerMeta;
 }
 
 /**

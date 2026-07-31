@@ -1,5 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import type { ReactNode } from 'react';
+import { useServerMeta } from '../api/queries';
 
 const REPO_URL = 'https://github.com/mkane848/HardlyKnowHer';
 
@@ -20,6 +21,15 @@ const formattedBuildDate = new Date(__APP_BUILD_DATE__).toLocaleString(undefined
  * rather than inventing a second modal look.
  */
 export function AboutDialog({ children }: { children: ReactNode }) {
+  const { data: meta } = useServerMeta();
+
+  // Only the date: the snapshot's time of day says nothing useful, and the
+  // card data changes at most daily. Absent while loading, or if the server
+  // is asleep or predates snapshot tracking — the line simply doesn't render.
+  const cardDataDate = meta?.cardDataUpdatedAt
+    ? new Date(meta.cardDataUpdatedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })
+    : null;
+
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>{children}</Dialog.Trigger>
@@ -45,6 +55,7 @@ export function AboutDialog({ children }: { children: ReactNode }) {
                     <a href="https://scryfall.com" target="_blank" rel="noreferrer noopener">
                       Scryfall
                     </a>
+                    {cardDataDate && <span className="about-build-date"> · {cardDataDate}</span>}
                   </dd>
                 </div>
                 <div>
