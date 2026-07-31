@@ -8,6 +8,9 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 // JSONL, not JSON: Scryfall's bulk endpoint now publishes newline-delimited
 // JSON, gzipped. See BulkDataEntry below.
 const OUTPUT_PATH = path.join(DATA_DIR, 'oracle-cards.jsonl');
+// Small companion file — see fetchFlavorNames below for why this isn't part
+// of the bulk download.
+const FLAVOR_NAMES_PATH = path.join(DATA_DIR, 'flavor-names.json');
 
 // How long a downloaded copy is considered good enough to reuse. The bulk
 // file only changes when Scryfall republishes it (roughly daily), and the
@@ -100,6 +103,10 @@ async function main() {
       `Reusing ${OUTPUT_PATH} (${existing.sizeMb}MB, ${existing.ageHours}h old).\n` +
         'Pass --force to download a fresh copy.'
     );
+    // Still fetch the re-skin names if we've never got them. Reusing the bulk
+    // file must not mean permanently skipping a companion file that didn't
+    // exist when that copy was downloaded.
+    if (!fs.existsSync(FLAVOR_NAMES_PATH)) await fetchFlavorNames();
     return;
   }
 
@@ -153,6 +160,61 @@ async function main() {
 
   const written = fs.statSync(OUTPUT_PATH).size;
   console.log(`Saved to ${OUTPUT_PATH} (${(written / 1024 / 1024).toFixed(1)}MB uncompressed).`);
+
+  await fetchFlavorNames();
+}
+
+/**
+ * Names that appear on re-skinned printings, and the card they really are.
+ *
+ * Universes Beyond and similar releases reprint an existing card under a
+ * different name — "Dracula, Voyager" is Edgar, Charmed Groom. Scryfall calls
+ * that a `flavor_name`, and it lives on the *printing*, not the oracle
+ * entry. The Oracle Cards bulk file has one row per oracle ID under the
+ * canonical name, so a list naming the re-skin resolves to nothing at all.
+ *
+ * Fetched from the search API rather than by switching to the `default_cards`
+ * bulk file: that file is one row per printing and three times the size, to
+ * recover a few hundred names. This is ~3 requests.
+ */
+async function fetchFlavorNames() {
+  console.log('Fetching re-skinned card names...');
+
+  const entries: { flavor_name: string; oracle_id: string }[] = [];
+  // unique=prints, not unique=cards. A re-skin lives on a *printing*, and
+  // unique=cards collapses each card to one printing — usually the canonical
+  // one, which is exactly the printing without the flavor name. That drops
+  // 176 of the 617 re-skinned printings on the floor.
+  let url: string | null =
+    'https://api.scryfall.com/cards/search?q=has%3Aflavorname&unique=prints';
+
+  while (url) {
+    const res: Response = await fetch(url, { headers: SCRYFALL_HEADERS });
+    if (!res.ok) {
+      // Non-fatal on purpose. Re-skin matching is a nicety; failing the whole
+      // data refresh over it would take the app down for a rounding error.
+      console.warn(`  Skipping re-skinned names (${await describeFailure(res)}).`);
+      return;
+    }
+    const page = (await res.json()) as {
+      data?: { flavor_name?: string; oracle_id?: string }[];
+      has_more?: boolean;
+      next_page?: string;
+    };
+    for (const card of page.data ?? []) {
+      if (card.flavor_name && card.oracle_id) {
+        entries.push({ flavor_name: card.flavor_name, oracle_id: card.oracle_id });
+      }
+    }
+    url = page.has_more ? page.next_page ?? null : null;
+    // Scryfall asks for 50-100ms between requests. See
+    // https://scryfall.com/docs/api — this is the whole reason it's polite
+    // to page rather than hammer.
+    if (url) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  fs.writeFileSync(FLAVOR_NAMES_PATH, JSON.stringify(entries, null, 2));
+  console.log(`Saved ${entries.length} re-skinned names to ${FLAVOR_NAMES_PATH}.`);
 }
 
 main().catch((err) => {

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { frontFaceCharacteristics, isCommanderEligible } from '../src/services/eligibility';
+import { faceNameEntries } from '../src/services/cardNames';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
@@ -98,18 +99,43 @@ db.exec(`
   CREATE INDEX idx_cards_partner_ability ON cards(partner_ability);
   CREATE INDEX idx_cards_is_background ON cards(is_background);
 
-  -- Lets a double-faced card be found by either face's name alone (e.g. a
-  -- pasted decklist naming just "Fable of the Mirror-Breaker", not the full
-  -- "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki"). Scoped to
-  -- true DFC layouts (transform, modal_dfc) — cards that are physically two
-  -- sides of one card — not split/adventure/flip cards, which share a
-  -- single face and are a different case.
+  -- Lets a multi-part card be found by one face's name alone, which is how
+  -- people actually write them down: "Adventurous Eater", not "Adventurous
+  -- Eater // Have a Bite".
+  --
+  -- This used to be scoped to transform/modal_dfc only, on the reasoning
+  -- that split/adventure/flip cards share a single physical face and were
+  -- "a different case". That distinction is real for rules purposes and
+  -- irrelevant here — what matters is whether the stored name contains a
+  -- "//" the user won't type. It does, so 384 gameplay cards across four
+  -- layouts were unfindable by the name on the card: adventure (166),
+  -- split (137), prepare (55), flip (26).
+  --
+  -- face_index is the face's position on the card. It exists to break ties:
+  -- 27 face names are also the real name of some *other* card ("Lightning
+  -- Bolt" is a card, and the back face of "Emeritus of Conflict //
+  -- Lightning Bolt"). Exact full-name matching already wins over this table
+  -- entirely (see findCardsByNames), and within it a front face outranks a
+  -- back face, so the standalone card is always what you get.
   DROP TABLE IF EXISTS card_face_names;
   CREATE TABLE card_face_names (
     face_name_lower TEXT NOT NULL,
-    oracle_id TEXT NOT NULL
+    oracle_id TEXT NOT NULL,
+    face_index INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX idx_face_names_lower ON card_face_names(face_name_lower);
+
+  -- Names a card carries on a re-skinned printing: "Dracula, Voyager" is
+  -- Edgar, Charmed Groom. These live on the printing rather than the oracle
+  -- entry, so the Oracle Cards bulk file doesn't contain them at all and a
+  -- list naming the re-skin resolved to nothing. Populated from the
+  -- companion file written by fetch-scryfall.ts.
+  DROP TABLE IF EXISTS card_flavor_names;
+  CREATE TABLE card_flavor_names (
+    flavor_name_lower TEXT NOT NULL,
+    oracle_id TEXT NOT NULL
+  );
+  CREATE INDEX idx_flavor_names_lower ON card_flavor_names(flavor_name_lower);
 `);
 
 function parseCreatureTypes(typeLine: string): string[] {
@@ -178,9 +204,14 @@ const insert = db.prepare(`
 `);
 
 const insertFaceName = db.prepare(`
-  INSERT INTO card_face_names (face_name_lower, oracle_id) VALUES (?, ?)
+  INSERT INTO card_face_names (face_name_lower, oracle_id, face_index) VALUES (?, ?, ?)
 `);
 
+/** Layouts that are genuinely two-sided, so there's a second image to flip to
+ * and a distinct back-face name to show. Split, adventure, prepare and flip
+ * cards all print on one physical face — their "second face" is the same
+ * picture — so they are deliberately not here. Which layouts get *name*
+ * indexing is a wider and separate question; see services/cardNames.ts. */
 const DFC_LAYOUTS = new Set(['transform', 'modal_dfc']);
 
 let imported = 0;
@@ -256,10 +287,8 @@ const insertMany = db.transaction((rows: any[]) => {
     });
     imported++;
 
-    if (DFC_LAYOUTS.has(card.layout) && Array.isArray(card.card_faces)) {
-      for (const face of card.card_faces as { name?: string }[]) {
-        if (face.name) insertFaceName.run(face.name.toLowerCase(), card.oracle_id);
-      }
+    for (const { faceNameLower, faceIndex } of faceNameEntries(card)) {
+      insertFaceName.run(faceNameLower, card.oracle_id, faceIndex);
     }
   }
 });
@@ -280,7 +309,45 @@ console.log(`${eligible.c} cards are Commander-eligible.`);
 console.log(`${banned.c} cards are currently banned in Commander.`);
 console.log(`${gameChangers.c} cards are on the Game Changers list.`);
 const faceNames = db.prepare('SELECT COUNT(*) as c FROM card_face_names').get() as { c: number };
-console.log(`${faceNames.c} double-faced card face names indexed for single-side matching.`);
+console.log(`${faceNames.c} face names indexed for single-side matching.`);
+
+// Re-skinned names, from the companion file fetch-scryfall.ts writes. Absent
+// when the fetch was skipped or predates that file — an older local database
+// just goes on without re-skin matching rather than failing the import.
+const FLAVOR_NAMES_PATH = path.join(DATA_DIR, 'flavor-names.json');
+if (fs.existsSync(FLAVOR_NAMES_PATH)) {
+  const knownOracleIds = new Set(
+    (db.prepare('SELECT oracle_id FROM cards').all() as { oracle_id: string }[]).map((r) => r.oracle_id)
+  );
+  const flavorEntries = JSON.parse(fs.readFileSync(FLAVOR_NAMES_PATH, 'utf-8')) as {
+    flavor_name?: string;
+    oracle_id?: string;
+  }[];
+  const insertFlavorName = db.prepare(
+    'INSERT INTO card_flavor_names (flavor_name_lower, oracle_id) VALUES (?, ?)'
+  );
+  let flavorImported = 0;
+  let flavorSkipped = 0;
+  db.transaction(() => {
+    for (const entry of flavorEntries) {
+      // A re-skin whose card didn't survive the import (a non-gameplay
+      // entry, say) would be a name pointing at nothing.
+      if (!entry.flavor_name || !entry.oracle_id || !knownOracleIds.has(entry.oracle_id)) {
+        flavorSkipped++;
+        continue;
+      }
+      insertFlavorName.run(entry.flavor_name.toLowerCase(), entry.oracle_id);
+      flavorImported++;
+    }
+  })();
+  console.log(
+    `${flavorImported} re-skinned card names indexed` +
+      (flavorSkipped > 0 ? ` (${flavorSkipped} skipped as unresolvable).` : '.')
+  );
+} else {
+  console.log('No flavor-names.json found — re-skinned card names not indexed.');
+  console.log('  Run `npm run fetch-scryfall` to fetch them.');
+}
 const partnerCounts = db
   .prepare(
     `SELECT partner_ability, COUNT(*) as c FROM cards WHERE partner_ability IS NOT NULL GROUP BY partner_ability`
