@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 interface Props {
   pageIndex: number;
   pageCount: number;
@@ -39,12 +41,35 @@ function pageItems(pageIndex: number, pageCount: number): (number | null)[] {
   return items;
 }
 
-/** Previous/Next plus direct page selection, shared by the suggestion grid
- * and each combo group. */
+/**
+ * How many pages there have to be before typing a page number beats clicking
+ * one. Below this the numbered buttons are all on screen anyway, so a text
+ * box would just be clutter.
+ */
+const JUMP_BOX_THRESHOLD = 10;
+
+/** Previous/Next, numbered pages, and — once there are enough pages that the
+ * numbers start collapsing behind ellipses — a box to type one into. Shared
+ * by the suggestion grid and each combo group. */
 export function Pagination({ pageIndex, pageCount, onPageChange, label }: Props) {
+  // Hooks run before the early return below, since a component may not change
+  // how many it calls between renders.
+  const [draft, setDraft] = useState('');
+
   if (pageCount <= 1) return null;
 
   const items = pageItems(pageIndex, pageCount);
+
+  const commitJump = () => {
+    const requested = Number(draft);
+    // Silently ignore anything that isn't a page — an empty box, a stray
+    // letter, 0, or a number past the end. Clearing the box on a bad entry
+    // is feedback enough for a control this small.
+    if (Number.isInteger(requested) && requested >= 1 && requested <= pageCount) {
+      onPageChange(requested - 1);
+    }
+    setDraft('');
+  };
 
   return (
     <nav className="pagination" aria-label={label}>
@@ -88,6 +113,40 @@ export function Pagination({ pageIndex, pageCount, onPageChange, label }: Props)
       >
         Next →
       </button>
+
+      {pageCount >= JUMP_BOX_THRESHOLD && (
+        // A form so Enter submits natively and the browser's own validation
+        // and mobile keyboards come along for free.
+        <form
+          className="page-jump"
+          onSubmit={(event) => {
+            event.preventDefault();
+            commitJump();
+          }}
+        >
+          <label className="page-jump-label" htmlFor={`${label}-jump`}>
+            Go to
+          </label>
+          <input
+            id={`${label}-jump`}
+            className="page-jump-input"
+            // `inputMode` rather than `type="number"`, whose spinners and
+            // scroll-to-change behaviour are a nuisance in a control this
+            // small — while still bringing up a numeric keypad on mobile.
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={draft}
+            placeholder={String(pageIndex + 1)}
+            aria-label={`Go to page (1 to ${pageCount})`}
+            onChange={(event) => setDraft(event.target.value.replace(/\D/g, ''))}
+            // Committing on blur as well as submit, so clicking away isn't
+            // silently discarded.
+            onBlur={commitJump}
+          />
+          <span className="page-jump-total">of {pageCount}</span>
+        </form>
+      )}
     </nav>
   );
 }

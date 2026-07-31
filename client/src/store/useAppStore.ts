@@ -21,6 +21,8 @@ interface AppState {
   dismiss: (unitId: string) => void;
   restore: (unitId: string) => void;
   restoreAll: () => void;
+  /** Clears the list, the results, and any dismissals. */
+  resetList: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -47,4 +49,9 @@ export const useAppStore = create<AppState>((set) => ({
   restore: (unitId) => set((state) => ({ dismissed: state.dismissed.filter((id) => id !== unitId) })),
 
   restoreAll: () => set({ dismissed: [] }),
+
+  // Back to a blank slate: the textarea, the submitted list, and any
+  // dismissals. Clearing submittedList is what actually retires the results,
+  // since every server query is keyed on it.
+  resetList: () => set({ rawList: '', submittedList: '', dismissed: [] }),
 }));

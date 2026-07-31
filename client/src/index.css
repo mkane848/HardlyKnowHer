@@ -18,6 +18,11 @@
   --pip-g: #1f7a45;
   --pip-c: #8c7a63;
 
+  /* Destructive actions. Muted enough not to fight the brass accent, red
+     enough to read as "this removes something". */
+  --danger: #8c2f2f;
+  --danger-text: #f8f4e3;
+
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
@@ -500,6 +505,44 @@ body {
   justify-content: center;
   gap: 1.1rem;
   margin-top: 1.75rem;
+  /* Wraps so the jump box drops below the controls on a narrow screen
+     rather than squeezing the numbers. */
+  flex-wrap: wrap;
+}
+
+/* Type a page number. Only rendered once there are enough pages that the
+   numbered buttons start collapsing behind ellipses. */
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.page-jump-input {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--ink-border);
+  border-radius: 6px;
+  /* Wide enough for four digits — a list long enough to need more pages than
+     that has other problems. */
+  width: 3.6rem;
+  padding: 0.35rem 0.4rem;
+  text-align: center;
+}
+
+.page-jump-input:focus {
+  outline: none;
+  border-color: var(--brass);
+}
+
+.page-jump-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
 .page-button {
@@ -1216,11 +1259,13 @@ summary.explain-group-title::after {
   min-width: 1.5em;
 }
 
-.support-mv {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--ink-text-muted);
-  white-space: nowrap;
+.support-cost {
+  /* Shrinks before the name does when a row is tight, but never below the
+     pips' own width — a truncated mana cost would be misinformation, not
+     just clipped text. */
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
 }
 
 .support-gc {
@@ -1747,4 +1792,61 @@ summary.explain-group-title::after {
     height: 40px;
     font-size: 1.35rem;
   }
+}
+
+/* Confirmation dialog for destructive actions. Narrower than the card
+   dialogs — it holds a sentence and two buttons, not artwork. */
+.confirm-dialog-card {
+  max-width: 26rem;
+}
+
+.confirm-description {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0.75rem 0 1.4rem;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.danger-button {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--danger-text);
+  background: var(--danger);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.5rem 0.95rem;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.danger-button:hover {
+  filter: brightness(1.12);
+}
+
+.danger-button:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* Shown above results when nothing cleared the quality bar. Bordered rather
+   than coloured like an error — the request succeeded, the answer is just
+   less confident than usual. */
+.weak-match-note {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  background: var(--ink-raised);
+  border: 1px solid var(--ink-border);
+  border-left: 3px solid var(--brass);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin: 0 0 1.25rem;
 }

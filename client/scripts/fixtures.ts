@@ -10,6 +10,7 @@ export function makeSupportingCard(overrides: Partial<SupportingCardDTO> = {}): 
     typeLine: null,
     isGameChanger: false,
     manaValue: null,
+    manaCost: null,
     imageUri: null,
     backImageUri: null,
     backName: null,

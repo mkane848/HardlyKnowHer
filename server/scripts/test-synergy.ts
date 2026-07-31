@@ -11,7 +11,13 @@
 import assert from 'node:assert';
 import type { CardRow } from '../src/types';
 import type { CommanderUnit } from '../src/services/partners';
-import { buildCollectionProfile, scoreCommanders, type OwnedCard } from '../src/services/synergy';
+import {
+  buildCollectionProfile,
+  scoreCommanders,
+  selectSuggestions,
+  type CommanderSuggestion,
+  type OwnedCard,
+} from '../src/services/synergy';
 
 let failures = 0;
 function check(label: string, fn: () => void) {
@@ -499,6 +505,90 @@ check('a pair does not match a creature type it merely has', () => {
   assert.strictEqual(suggestions.length, 1);
   assert.ok(suggestions[0].matchedThemes.includes('Aristocrats'));
   assert.ok(!suggestions[0].matchedCreatureTypes.includes('Vampire'));
+});
+
+// --- selecting which suggestions are worth showing ------------------------
+
+/** A scored suggestion with the given signal sizes, for selection tests. */
+function suggestionWithSignals(sizes: number[], score = 5): CommanderSuggestion {
+  const cards = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      name: `Card ${i}`,
+      quantity: 1,
+      typeLine: null,
+      isGameChanger: false,
+      manaValue: null,
+      manaCost: null,
+      imageUri: null,
+      backImageUri: null,
+      backName: null,
+      scryfallUri: null,
+    }));
+  return {
+    cards: [makeCard({ name: `Unit ${counter++}` })],
+    score,
+    matchedThemes: [],
+    matchedCreatureTypes: [],
+    matchedKeywords: [],
+    includedCardCount: 50,
+    themeSupport: sizes.map((n, i) => ({
+      key: `t${i}`,
+      label: `Theme ${i}`,
+      description: '',
+      cards: cards(n),
+    })),
+    kindredSupport: [],
+    keywordSupport: [],
+    gameChangerCards: [],
+  };
+}
+
+check('a single bare-minimum signal is not worth showing', () => {
+  // The case this exists for: a real graveyard list returned 877 commanders
+  // that all matched one archetype on the same three cards, scoring 3.3 to
+  // 5.0. They are indistinguishable because they are all just "a commander
+  // that sacrifices creatures".
+  const noise = Array.from({ length: 20 }, () => suggestionWithSignals([3]));
+  const result = selectSuggestions(noise);
+  assert.strictEqual(result.weakMatchesOnly, true);
+});
+
+check('one deep signal is enough on its own', () => {
+  const deep = suggestionWithSignals([5]);
+  const result = selectSuggestions([deep, suggestionWithSignals([3])]);
+  assert.strictEqual(result.weakMatchesOnly, false);
+  assert.strictEqual(result.suggestions.length, 1);
+});
+
+check('two shallow signals are enough on their own', () => {
+  const broad = suggestionWithSignals([3, 3]);
+  const result = selectSuggestions([broad, suggestionWithSignals([3])]);
+  assert.strictEqual(result.weakMatchesOnly, false);
+  assert.strictEqual(result.suggestions.length, 1);
+});
+
+check('nothing worth showing falls back to a short flagged list, not an empty page', () => {
+  // An empty result would be technically defensible and useless. The caller
+  // gets the closest few, flagged, so it can say the pattern was weak.
+  const noise = Array.from({ length: 400 }, (_, i) => suggestionWithSignals([3], 5 - i * 0.001));
+  const result = selectSuggestions(noise);
+  assert.strictEqual(result.weakMatchesOnly, true);
+  assert.strictEqual(result.suggestions.length, 12);
+  // Still the best of a bad lot, in order.
+  assert.ok(result.suggestions[0].score > result.suggestions[11].score);
+});
+
+check('selection is not a cap — a list with real depth keeps everything', () => {
+  const many = Array.from({ length: 500 }, () => suggestionWithSignals([8]));
+  const result = selectSuggestions(many);
+  assert.strictEqual(result.weakMatchesOnly, false);
+  assert.strictEqual(result.suggestions.length, 500);
+});
+
+check('an empty input stays empty rather than reporting weak matches', () => {
+  const result = selectSuggestions([]);
+  assert.strictEqual(result.suggestions.length, 0);
+  assert.strictEqual(result.weakMatchesOnly, true);
 });
 
 if (failures > 0) {

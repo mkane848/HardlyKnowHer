@@ -9,6 +9,63 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cards written down the way people actually write them now match.** A card
+  stored as "Adventurous Eater // Have a Bite" was only findable by that full
+  joined name. Single-face matching existed but covered just two layouts, so
+  384 gameplay cards were unfindable by the name printed on them — adventure
+  (166), split (137), prepare (55), and flip (26). Typing "Adventurous Eater"
+  or "Gollum, Silent Slinker" now resolves. Cards whose face name is also a
+  real card in its own right — "Lightning Bolt" is both a card and the back
+  face of another — still resolve to the standalone card.
+- **Re-skinned printings match.** "Count Dracula" is Sorin the Mirthless, and
+  "You're Gonna Need a Bigger Boat" is Abrade. These alternate names live on
+  the printing rather than the card, so the bulk data has none of them; 602 of
+  them, covering 428 cards, are now indexed.
+
+### Changed
+
+- **The card data refresh only does work when there's new data.** Re-running
+  it now compares against the published snapshot instead of guessing from the
+  file's age — the old rule reused a week-old copy after Scryfall had
+  published something newer, and re-downloaded 24 MB of unchanged data. A
+  no-op refresh went from ~12 seconds and a 24 MB download to ~2 seconds and
+  almost nothing. Deploys are unaffected: they start from an empty directory
+  and build everything, as before. See `docs/card-data-strategy.md`.
+- The About dialog shows when the card data was published, alongside the
+  existing app version and build date.
+- **Cited cards show their real mana cost**, as symbols, instead of "MV 3" —
+  the pips carry the card's colors as well as its cost, which the number
+  didn't. Each list is now ordered by mana value and then alphabetically, the
+  way a decklist reads; cards with no mana value (lands) sort last rather
+  than as zero.
+- Results-per-page options are **12 / 24 / 48 / 96**, replacing 9 / 18 / 36 /
+  72. All of them still fill whole rows of the grid, and the new set does so
+  at four columns as well as three, so wide screens no longer end on a ragged
+  row. An existing saved preference moves to the nearest new option rather
+  than resetting.
+- **Far fewer, better results.** A commander whose entire case was one
+  archetype matched on the bare minimum of three cards is a coincidence, not
+  a recommendation — and there are hundreds of them for any given list. A
+  suggestion now has to show either a signal with five or more of your cards
+  behind it, or more than one signal at all. On a focused kindred list that
+  cut results from 1,400 to 768 while leaving every real match in place; on
+  a list with no strong pattern it cut 877 near-identical suggestions to a
+  short, clearly-labelled shortlist. This is a quality bar, not a cap: a list
+  with genuine depth still gets everything that fits it.
+- When nothing clears that bar, the results now **say so** rather than
+  presenting the closest few as a confident ranking.
+
+### Added
+
+- **A Clear button for the card list**, behind a confirmation step, since
+  nothing is saved and a mis-click would mean pasting the list again. It only
+  appears when there is something to clear.
+- **Type a page number** to jump straight to it, alongside the numbered
+  buttons. Only shown once there are enough pages that the numbers start
+  collapsing behind an ellipsis.
+
 ## [1.6.0] — 2026-07-30
 
 ### Fixed

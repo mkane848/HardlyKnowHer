@@ -11,6 +11,8 @@ export interface SupportingCardDTO {
   typeLine: string | null;
   isGameChanger: boolean;
   manaValue: number | null;
+  /** Printed cost, e.g. "{2}{B}{B}". Null for lands and anything without one. */
+  manaCost: string | null;
   imageUri: string | null;
   /** Second face of a transform/modal DFC, for the art preview's flip control. */
   backImageUri: string | null;
@@ -95,5 +97,17 @@ export interface RecommendResponse {
   /** Copies dropped because Commander is singleton — see services/singleton.ts. */
   ignoredCopies: number;
   notFound: string[];
+  /** True when no commander showed a real pattern, so `suggestions` is just
+   * the closest few rather than a confident ranking. */
+  weakMatchesOnly: boolean;
   suggestions: CommanderSuggestionDTO[];
+}
+
+/** Server-side facts about the deployment itself, from /api/meta. */
+export interface ServerMeta {
+  /** Scryfall's publish time for the bulk snapshot the card database was
+   * built from. Null when the database predates snapshot tracking. */
+  cardDataUpdatedAt: string | null;
+  /** When that import ran. Null for the same reason. */
+  importedAt: string | null;
 }

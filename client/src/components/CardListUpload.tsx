@@ -1,12 +1,14 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useRecommendations } from '../api/queries';
+import { ConfirmDialog } from './ConfirmDialog';
 
 export function CardListUpload() {
   const rawList = useAppStore((s) => s.rawList);
   const submittedList = useAppStore((s) => s.submittedList);
   const setRawList = useAppStore((s) => s.setRawList);
   const submitList = useAppStore((s) => s.submitList);
+  const resetList = useAppStore((s) => s.resetList);
 
   const [fileName, setFileName] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -52,6 +54,16 @@ export function CardListUpload() {
     }
     setValidationError(null);
     submitList(rawList);
+  }
+
+  function handleReset() {
+    resetList();
+    // Local UI state the store doesn't own, but which would otherwise
+    // outlive the list it describes: a filename with no file, an error
+    // about text that's gone, and a panel collapsed around nothing.
+    setFileName(null);
+    setValidationError(null);
+    setCollapsed(false);
   }
 
   const lineCount = rawList.split(/\r?\n/).filter((line) => line.trim()).length;
@@ -108,6 +120,23 @@ export function CardListUpload() {
               />
             </label>
             {fileName && <span className="file-name">{fileName}</span>}
+            {/* Only offered when there's something to lose. */}
+            {(rawList.trim().length > 0 || submittedList.length > 0) && (
+              <ConfirmDialog
+                title="Clear this list?"
+                description={
+                  submittedList.length > 0
+                    ? 'This clears the cards you pasted and the suggestions found for them. Nothing is saved, so you would need to paste the list again.'
+                    : 'This clears the cards you pasted. Nothing is saved, so you would need to paste them again.'
+                }
+                confirmLabel="Clear list"
+                onConfirm={handleReset}
+              >
+                <button type="button" className="page-button">
+                  Clear
+                </button>
+              </ConfirmDialog>
+            )}
             <button type="submit" className="primary-button" disabled={isFetching}>
               {isFetching ? 'Finding synergies…' : 'Suggest Commanders'}
             </button>

@@ -37,23 +37,54 @@ const exactNameStmt = db.prepare('SELECT * FROM cards WHERE name_lower = ? LIMIT
 // stale local DB crash the server on the first prepared statement — the
 // fallback below just degrades to exact-name-only matching, same as before
 // this table existed.
+// Ordered by face_index so a front face outranks a back face when two cards
+// share a face name — "Lightning Bolt" should never resolve to "Emeritus of
+// Conflict // Lightning Bolt". Exact full-name matching (below) already wins
+// over this table outright; this only settles ties *within* it.
+//
+// COALESCE keeps a database seeded before face_index existed working: older
+// rows read as 0 rather than making the whole statement fail.
 const faceNameStmt = tableExists('card_face_names')
   ? db.prepare(`
       SELECT cards.* FROM card_face_names
       JOIN cards ON cards.oracle_id = card_face_names.oracle_id
       WHERE card_face_names.face_name_lower = ?
+      ORDER BY COALESCE(card_face_names.face_index, 0) ASC
       LIMIT 1
     `)
   : null;
 
+// Re-skinned printing names ("Dracula, Voyager" -> Edgar, Charmed Groom).
+// Guarded like card_face_names: a database seeded before this table existed
+// still passes isSeeded, and degrades to matching without re-skins.
+const flavorNameStmt = tableExists('card_flavor_names')
+  ? db.prepare(`
+      SELECT cards.* FROM card_flavor_names
+      JOIN cards ON cards.oracle_id = card_flavor_names.oracle_id
+      WHERE card_flavor_names.flavor_name_lower = ?
+      LIMIT 1
+    `)
+  : null;
+
+/**
+ * Resolves written-down card names to rows, in decreasing order of certainty:
+ *
+ *   1. the exact full name, which is what most cards are;
+ *   2. a face name, front faces before back faces;
+ *   3. a re-skinned printing's name.
+ *
+ * The order is what keeps the broader matching safe. 27 face names are also
+ * the real name of a different card — "Lightning Bolt" is a card, and the
+ * back face of "Emeritus of Conflict // Lightning Bolt" — so exact matching
+ * has to win outright, and re-skins come last for the same reason.
+ */
 export function findCardsByNames(names: string[]): Map<string, CardRow> {
   const map = new Map<string, CardRow>();
   for (const name of names) {
     const lower = name.toLowerCase();
-    // Exact full name first — this is what most cards are, and it's what
-    // stops a double-faced card's own back-face name from ever shadowing a
-    // real single-faced card that happens to share it.
-    const row = (exactNameStmt.get(lower) ?? faceNameStmt?.get(lower)) as CardRow | undefined;
+    const row = (exactNameStmt.get(lower) ??
+      faceNameStmt?.get(lower) ??
+      flavorNameStmt?.get(lower)) as CardRow | undefined;
     if (row) map.set(lower, row);
   }
   return map;

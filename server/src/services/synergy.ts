@@ -46,6 +46,10 @@ export interface SupportingCard {
   typeLine: string | null;
   isGameChanger: boolean;
   manaValue: number | null;
+  /** Printed cost, e.g. "{2}{B}{B}". Null for lands and anything without
+   * one. Carried alongside manaValue because the two answer different
+   * questions: manaValue sorts, manaCost is what a player reads. */
+  manaCost: string | null;
   imageUri: string | null;
   backImageUri: string | null;
   backName: string | null;
@@ -103,6 +107,7 @@ function toSupportingCard({ row, quantity }: OwnedCard): SupportingCard {
     typeLine: row.type_line,
     isGameChanger: !!row.game_changer,
     manaValue: row.cmc,
+    manaCost: row.mana_cost,
     imageUri: row.image_uri,
     backImageUri: row.back_image_uri ?? null,
     backName: row.back_name ?? null,
@@ -343,4 +348,69 @@ export function scoreCommanders(
 
   suggestions.sort((a, b) => b.score - a.score);
   return suggestions;
+}
+
+/**
+ * How many suggestions to fall back to when none of them clear the quality
+ * bar. One page's worth — enough to be useful, few enough that it reads as
+ * "here's the closest we found" rather than a real ranking.
+ */
+const WEAK_MATCH_FALLBACK = 12;
+
+/** Every signal's supporting-card count, across all three families. */
+function signalSizes(suggestion: CommanderSuggestion): number[] {
+  return [
+    ...suggestion.themeSupport.map((t) => t.cards.length),
+    ...suggestion.kindredSupport.map((k) => k.cards.length),
+    ...suggestion.keywordSupport.map((k) => k.cards.length),
+  ];
+}
+
+/**
+ * Whether a suggestion is worth showing, as opposed to a coincidence.
+ *
+ * A commander whose entire case is *one* signal sitting at exactly
+ * MIN_SIGNAL_COUNT has told us nothing: on a real graveyard list, 877
+ * commanders came back matching the same one archetype on the same three
+ * cards, every one scoring between 3.3 and 5.0. Sorting that is meaningless
+ * — they are genuinely indistinguishable, because they are all just "a
+ * commander that sacrifices creatures".
+ *
+ * So the bar is depth *or* breadth: one signal deep enough to matter, or
+ * more than one signal at all. Note this is a structural test rather than a
+ * score threshold. A fixed score floor cannot work here — the same number
+ * that trims a focused kindred list (top score 51.9) wipes out every result
+ * for a list whose whole range is 3.3 to 5.0.
+ */
+function isMeaningfulMatch(suggestion: CommanderSuggestion): boolean {
+  const sizes = signalSizes(suggestion);
+  return sizes.length >= 2 || sizes.some((size) => size >= DEEP_SIGNAL_COUNT);
+}
+
+export interface SelectedSuggestions {
+  suggestions: CommanderSuggestion[];
+  /**
+   * True when nothing cleared the bar and these are just the closest
+   * matches. The caller should say so rather than presenting them as
+   * confident recommendations.
+   */
+  weakMatchesOnly: boolean;
+}
+
+/**
+ * Narrows scored suggestions to the ones worth showing.
+ *
+ * Deliberately not a cap on how many come back: a list with a genuinely deep
+ * theme should return everything that fits it. What gets cut is the long
+ * tail of commanders matching one bare-minimum signal, which is what made
+ * result counts run to four figures.
+ *
+ * When *nothing* clears the bar the list simply has no strong pattern. That
+ * is worth saying out loud, but not worth answering with an empty page, so a
+ * short flagged fallback comes back instead.
+ */
+export function selectSuggestions(scored: CommanderSuggestion[]): SelectedSuggestions {
+  const meaningful = scored.filter(isMeaningfulMatch);
+  if (meaningful.length > 0) return { suggestions: meaningful, weakMatchesOnly: false };
+  return { suggestions: scored.slice(0, WEAK_MATCH_FALLBACK), weakMatchesOnly: true };
 }
