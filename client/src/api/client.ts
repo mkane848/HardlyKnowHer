@@ -1,4 +1,10 @@
-import type { ComboLookupResponse, RecommendResponse, ServerMeta } from '../types';
+import type {
+  ComboLookupResponse,
+  RecommendResponse,
+  ServerMeta,
+  WireRecommendResponse,
+} from '../types';
+import { rehydrateRecommendations } from '../lib/rehydrate';
 
 // In dev, this is left empty and Vite's proxy forwards /api to localhost:4000
 // (see vite.config.ts). In production, set VITE_API_URL to your deployed
@@ -74,8 +80,12 @@ export function wakeServer(): void {
   void fetch(`${API_BASE}/api/health`, { method: 'GET' }).catch(() => {});
 }
 
-export function fetchRecommendations(rawList: string): Promise<RecommendResponse> {
-  return postJson<RecommendResponse>('/api/recommend', { list: rawList });
+export async function fetchRecommendations(rawList: string): Promise<RecommendResponse> {
+  // Cited cards arrive once with citations by position; put them back here so
+  // the rest of the app never sees the wire shape. See lib/rehydrate.ts.
+  return rehydrateRecommendations(
+    await postJson<WireRecommendResponse>('/api/recommend', { list: rawList })
+  );
 }
 
 /**

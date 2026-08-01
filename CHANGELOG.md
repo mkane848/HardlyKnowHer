@@ -9,6 +9,27 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-08-01
+
+### Fixed
+
+- **The recommendation response was 12 MB, sent uncompressed.** Two separate
+  causes, both measured before anything was changed — see
+  `docs/response-size.md`.
+  - There was no compression middleware at all. The browser asked for gzip;
+    the server answered with 12,224,814 uncompressed bytes.
+  - Each cited card was serialized once per commander that cited it. A cited
+    card is by definition one of *your* cards, so one 30-card list produced
+    **26,618 card entries backed by 28 distinct cards** — 84% of the payload.
+    They are now sent once and cited by position, and put back together at
+    the client's API boundary, so nothing in the UI changed.
+
+  A 12.22 MB response is now 2.88 MB of JSON and **0.25 MB on the wire**, 49×
+  smaller. The other two test lists came in 25× and 40× smaller. Server-side
+  pagination was considered and rejected: it would have meant degrading the
+  filter bar, which needs the whole result set to count and offer its options,
+  to solve a problem two smaller changes solve outright.
+
 ## [1.7.0] — 2026-08-01
 
 ### Fixed

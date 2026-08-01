@@ -13,10 +13,12 @@ import {
   scoreCommanders,
   selectSuggestions,
   type OwnedCard,
+  type SupportingCard,
 } from '../services/synergy';
 import { buildCommanderUnits, unitKey } from '../services/partners';
 import { estimateBracket } from '../services/bracket';
 import { applySingletonLimits } from '../services/singleton';
+import { createCardIndex } from '../services/cardIndex';
 import { analyzeDeck } from '../services/deckAnalysis';
 import { attachSuggestions, collectionColors, requiredSignalKeys } from '../services/packages';
 
@@ -95,6 +97,12 @@ router.post('/recommend', (req, res) => {
   });
   const { suggestions: selected, weakMatchesOnly } = selectSuggestions(scored);
 
+  // Cited cards go out once, referenced by position — see cardIndex.ts. This
+  // is filled as the suggestions below are serialized, so it must be read
+  // after that map, not during it.
+  const cardIndex = createCardIndex();
+  const cite = (cards: SupportingCard[]) => cards.map((card) => cardIndex.indexOf(card));
+
   const suggestions = selected.map((s) => {
     // Every card in the unit counts toward the Bracket, alongside any Game
     // Changers in the list that fit its color identity — a Partner pair is
@@ -129,10 +137,10 @@ router.post('/recommend', (req, res) => {
       matchedCreatureTypes: s.matchedCreatureTypes,
       matchedKeywords: s.matchedKeywords,
       includedCardCount: s.includedCardCount,
-      themeSupport: s.themeSupport,
-      kindredSupport: s.kindredSupport,
-      keywordSupport: s.keywordSupport,
-      gameChangerCards: s.gameChangerCards,
+      themeSupport: s.themeSupport.map((t) => ({ ...t, cards: cite(t.cards) })),
+      kindredSupport: s.kindredSupport.map((k) => ({ ...k, cards: cite(k.cards) })),
+      keywordSupport: s.keywordSupport.map((k) => ({ ...k, cards: cite(k.cards) })),
+      gameChangerCards: cite(s.gameChangerCards),
       gameChangerCount,
       bracket: estimateBracket(gameChangerCount),
     };
@@ -151,6 +159,9 @@ router.post('/recommend', (req, res) => {
     // closest few. The client says so rather than presenting them as
     // confident recommendations.
     weakMatchesOnly,
+    // Every card cited by a suggestion, once. `themeSupport` and friends
+    // hold positions into this rather than repeating whole card objects.
+    cardIndex: cardIndex.cards,
     // The list's own strongest archetypes, and whether each one actually
     // functions — answerable without picking a commander at all.
     deck,
