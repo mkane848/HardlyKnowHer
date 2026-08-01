@@ -14,8 +14,10 @@ import assert from 'node:assert';
 import type { CardRow } from '../src/types';
 import {
   buildCardFacts,
+  buildVocabulary,
   detectSignals,
   hasActiveRole,
+  parseCreatureTypes,
   stripSelfReferences,
   type Role,
   type SignalMatch,
@@ -65,9 +67,10 @@ function makeCard(overrides: Partial<CardRow> = {}): CardRow {
   };
 }
 
-/** Detect against a list that contains these creature types / keywords. */
+/** Detect against a vocabulary containing these creature types / keywords. */
 function signalsFor(row: CardRow, creatureTypes: string[] = [], keywords: string[] = []): SignalMatch[] {
-  return detectSignals(buildCardFacts(row, creatureTypes), { creatureTypes, keywords });
+  const vocab = buildVocabulary(creatureTypes, keywords);
+  return detectSignals(buildCardFacts(row, vocab), vocab);
 }
 
 function find(signals: SignalMatch[], archetype: string, qualifier?: string): SignalMatch | undefined {
@@ -393,7 +396,82 @@ check('an Equipment is a Voltron card by type', () => {
   });
   const roles = rolesOf(signalsFor(sword), 'voltron');
   assert.ok(roles.includes('is'));
-  assert.ok(roles.includes('rewards'));
+});
+
+check('an Equipment is not its own payoff', () => {
+  // "Equipped creature gets +2/+2" is the suit doing its job. Counting it as
+  // a payoff made every Equipment satisfy the payoff slot, so a 20-card
+  // Equipment pile read as a complete Voltron deck while lacking any reason
+  // to be stacking Equipment at all.
+  const sword = makeCard({
+    name: 'Test Blade',
+    type_line: 'Artifact — Equipment',
+    oracle_text: 'Equipped creature gets +2/+2 and has trample.\nEquip {2}',
+  });
+  assert.ok(!rolesOf(signalsFor(sword), 'voltron').includes('rewards'));
+});
+
+check('a card that rewards suiting up is a payoff', () => {
+  // Sram, Senior Edificer's actual text.
+  const sram = makeCard({
+    name: 'Test Scribe',
+    type_line: 'Legendary Creature — Dwarf Advisor',
+    oracle_text: 'Whenever you cast an Aura, Equipment, or Vehicle spell, draw a card.',
+  });
+  assert.ok(rolesOf(signalsFor(sram), 'voltron').includes('rewards'));
+});
+
+check('a card scaling off how many Equipment you have is a payoff', () => {
+  const gauntlets = makeCard({
+    name: 'Test Gauntlets',
+    type_line: 'Artifact — Equipment',
+    oracle_text: 'Equipped creature gets +1/+1 for each Equipment you control.\nEquip {2}',
+  });
+  assert.ok(rolesOf(signalsFor(gauntlets), 'voltron').includes('rewards'));
+});
+
+// --- creature types: the vocabulary the rest of this depends on ------------
+
+const CREATURE_TYPES = new Set(['Boar', 'Lhurgoyf', 'Knight', 'Goblin', 'Elf', 'Wall']);
+
+check('a card with no subtypes has no creature types', () => {
+  assert.deepStrictEqual(parseCreatureTypes('Instant'), []);
+});
+
+check('a non-creature card contributes no creature types', () => {
+  // "Battle — Control Point" is the one that broke it: every card reading
+  // "creatures you control" was detected as caring about Control Kindred.
+  assert.deepStrictEqual(parseCreatureTypes('Battle — Control Point', CREATURE_TYPES), []);
+  assert.deepStrictEqual(parseCreatureTypes('Land — Cave', CREATURE_TYPES), []);
+  assert.deepStrictEqual(parseCreatureTypes('Artifact — Equipment', CREATURE_TYPES), []);
+  assert.deepStrictEqual(parseCreatureTypes('Enchantment — Aura', CREATURE_TYPES), []);
+});
+
+check("a creature card's non-creature subtypes are dropped", () => {
+  // The subtypes of one card are mixed and not positionally separable, so
+  // the catalog is what settles it.
+  assert.deepStrictEqual(
+    parseCreatureTypes('Artifact Creature — Equipment Boar', CREATURE_TYPES),
+    ['Boar']
+  );
+  assert.deepStrictEqual(
+    parseCreatureTypes('Enchantment Creature — Saga Knight', CREATURE_TYPES),
+    ['Knight']
+  );
+});
+
+check('Kindred cards carry creature types even without being creatures', () => {
+  assert.deepStrictEqual(
+    parseCreatureTypes('Kindred Enchantment — Lhurgoyf Aura', CREATURE_TYPES),
+    ['Lhurgoyf']
+  );
+});
+
+check('without a catalog it falls back to type-line structure alone', () => {
+  // A database seeded before the catalog file existed still gets the
+  // Creature/Kindred gate rather than nothing.
+  assert.deepStrictEqual(parseCreatureTypes('Battle — Control Point'), []);
+  assert.deepStrictEqual(parseCreatureTypes('Creature — Goblin Wizard'), ['Goblin', 'Wizard']);
 });
 
 if (failures > 0) {

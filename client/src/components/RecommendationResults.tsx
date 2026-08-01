@@ -12,6 +12,7 @@ import { useRecommendations } from '../api/queries';
 import { applyFilters, availableFilterValues, EMPTY_FILTERS, hasActiveFilters } from '../lib/filters';
 import { sortSuggestions, type SortDirection, type SortMode } from '../lib/sort';
 import { CommanderCard } from './CommanderCard';
+import { DeckSummary } from './DeckSummary';
 import { Pagination } from './Pagination';
 import { ResultFilters } from './ResultFilters';
 import type { CommanderSuggestionDTO } from '../types';
@@ -179,6 +180,11 @@ export function RecommendationResults() {
         )}
         {sorted.length > 0 && <ExportControls suggestions={sorted} />}
       </div>
+
+      {/* Above the commander grid, because it is about the list rather than
+          the suggestions — and because a list that can't execute its own
+          game plan is worth knowing before shopping for a commander. */}
+      <DeckSummary deck={result.deck} />
 
       {suggestions.length === 0 ? (
         <p className="status-empty">

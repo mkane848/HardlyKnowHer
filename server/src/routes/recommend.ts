@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { isSeeded, findCardsByNames, getCommanderCandidates, getBackgroundCards } from '../db';
+import {
+  isSeeded,
+  findCardsByNames,
+  findCardsBySignals,
+  findSignalsByOracleIds,
+  getCommanderCandidates,
+  getBackgroundCards,
+} from '../db';
 import { parseCardList } from '../services/parseList';
 import {
   buildCollectionProfile,
@@ -10,6 +17,8 @@ import {
 import { buildCommanderUnits, unitKey } from '../services/partners';
 import { estimateBracket } from '../services/bracket';
 import { applySingletonLimits } from '../services/singleton';
+import { analyzeDeck } from '../services/deckAnalysis';
+import { attachSuggestions, collectionColors, requiredSignalKeys } from '../services/packages';
 
 const router = Router();
 
@@ -70,6 +79,20 @@ router.post('/recommend', (req, res) => {
   // owns pagination over whatever survives, since it needs the full set for
   // the filter bar's counts and options anyway.
   const scored = scoreCommanders(units, profile, owned);
+
+  // What the *list* is doing, independent of any commander. Reads the same
+  // precomputed relationships the scorer does rather than deriving its own,
+  // then queries them in reverse to fill whichever part of a game plan the
+  // list cannot execute.
+  const analysis = analyzeDeck(
+    owned,
+    findSignalsByOracleIds(owned.map((entry) => entry.row.oracle_id))
+  );
+  const deck = attachSuggestions(analysis, {
+    candidatesByKey: findCardsBySignals(requiredSignalKeys(analysis)),
+    ownedOracleIds: new Set(owned.map((entry) => entry.row.oracle_id)),
+    allowedColors: collectionColors(owned.map((entry) => entry.row)),
+  });
   const { suggestions: selected, weakMatchesOnly } = selectSuggestions(scored);
 
   const suggestions = selected.map((s) => {
@@ -128,6 +151,9 @@ router.post('/recommend', (req, res) => {
     // closest few. The client says so rather than presenting them as
     // confident recommendations.
     weakMatchesOnly,
+    // The list's own strongest archetypes, and whether each one actually
+    // functions — answerable without picking a commander at all.
+    deck,
     suggestions,
   });
 });
