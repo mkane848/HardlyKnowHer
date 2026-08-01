@@ -396,7 +396,38 @@ check('an Equipment is a Voltron card by type', () => {
   });
   const roles = rolesOf(signalsFor(sword), 'voltron');
   assert.ok(roles.includes('is'));
-  assert.ok(roles.includes('rewards'));
+});
+
+check('an Equipment is not its own payoff', () => {
+  // "Equipped creature gets +2/+2" is the suit doing its job. Counting it as
+  // a payoff made every Equipment satisfy the payoff slot, so a 20-card
+  // Equipment pile read as a complete Voltron deck while lacking any reason
+  // to be stacking Equipment at all.
+  const sword = makeCard({
+    name: 'Test Blade',
+    type_line: 'Artifact — Equipment',
+    oracle_text: 'Equipped creature gets +2/+2 and has trample.\nEquip {2}',
+  });
+  assert.ok(!rolesOf(signalsFor(sword), 'voltron').includes('rewards'));
+});
+
+check('a card that rewards suiting up is a payoff', () => {
+  // Sram, Senior Edificer's actual text.
+  const sram = makeCard({
+    name: 'Test Scribe',
+    type_line: 'Legendary Creature — Dwarf Advisor',
+    oracle_text: 'Whenever you cast an Aura, Equipment, or Vehicle spell, draw a card.',
+  });
+  assert.ok(rolesOf(signalsFor(sram), 'voltron').includes('rewards'));
+});
+
+check('a card scaling off how many Equipment you have is a payoff', () => {
+  const gauntlets = makeCard({
+    name: 'Test Gauntlets',
+    type_line: 'Artifact — Equipment',
+    oracle_text: 'Equipped creature gets +1/+1 for each Equipment you control.\nEquip {2}',
+  });
+  assert.ok(rolesOf(signalsFor(gauntlets), 'voltron').includes('rewards'));
 });
 
 // --- creature types: the vocabulary the rest of this depends on ------------

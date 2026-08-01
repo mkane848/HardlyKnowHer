@@ -462,11 +462,20 @@ export const ARCHETYPES: ArchetypeDef[] = [
       is: [(f) => f.isEquipment || f.isAura],
       produces: [/\battach\b/i, /\benchant creature\b/i],
       consumes: [/\bequip \{/i],
+      // Deliberately NOT "equipped creature gets/has/gains": that is every
+      // Equipment describing its own effect, so it made each suit its own
+      // payoff. A 20-card Equipment pile came back with "14 payoffs" and a
+      // complete Voltron chain, when what it actually lacked was any reason
+      // to be stacking Equipment at all. A payoff is a card that rewards you
+      // for suiting up and is not itself the suit.
       rewards: [
-        /equipped creature (?:gets|has|gains)/i,
-        /enchanted creature (?:gets|has|gains)/i,
-        /as long as[^.;]*(?:equipped|enchanted)/i,
+        /whenever you (?:cast|play) an? (?:equipment|aura)/i,
+        /whenever an? (?:equipment|aura)[^.;]*enters/i,
+        /whenever[^.;]*becomes (?:attached|equipped|enchanted)/i,
         /for each (?:equipment|aura)/i,
+        /equip abilities you activate cost/i,
+        /equipped creatures you control/i,
+        /enchanted creatures you control/i,
       ],
     },
   },

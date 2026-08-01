@@ -91,6 +91,52 @@ export interface ComboLookupResponse {
   searchedCardCount: number;
 }
 
+/** What a card does for an archetype — see server/src/services/signals.ts. */
+export type RoleDTO = 'is' | 'produces' | 'consumes' | 'rewards' | 'amplifies';
+
+/** One of your cards, listed under the theme it plays into. */
+export interface SlotCardDTO extends SupportingCardDTO {
+  roles: RoleDTO[];
+}
+
+/** A card you don't have, offered to fill a slot your list can't. */
+export interface SlotSuggestionDTO extends SupportingCardDTO {
+  oracleId: string;
+  /** Your other themes this card would also feed. */
+  alsoFits: string[];
+}
+
+/** One link in an archetype's chain, and whether the list has it. */
+export interface SlotStatusDTO {
+  key: string;
+  label: string;
+  description: string;
+  cards: SlotCardDTO[];
+  suggestions: SlotSuggestionDTO[];
+  minimum: number;
+  filled: boolean;
+  /** The slot this archetype is *usually* short on. A low-confidence hint,
+   * not a measurement — the UI has to say so. */
+  commonlyMissing: boolean;
+}
+
+export interface DeckThemeDTO {
+  archetype: string;
+  qualifier?: string;
+  label: string;
+  description: string;
+  cardCount: number;
+  cards: SlotCardDTO[];
+  /** Empty for archetypes with no chain to break, like kindred. */
+  slots: SlotStatusDTO[];
+  complete: boolean;
+}
+
+/** What your list is doing, independent of any commander. */
+export interface DeckAnalysisDTO {
+  themes: DeckThemeDTO[];
+}
+
 export interface RecommendResponse {
   totalParsed: number;
   totalMatched: number;
@@ -100,6 +146,8 @@ export interface RecommendResponse {
   /** True when no commander showed a real pattern, so `suggestions` is just
    * the closest few rather than a confident ranking. */
   weakMatchesOnly: boolean;
+  /** The list's own strongest archetypes, and whether each one functions. */
+  deck: DeckAnalysisDTO;
   suggestions: CommanderSuggestionDTO[];
 }
 

@@ -45,7 +45,7 @@ export interface SnapshotInfo {
  * If you touch import logic and don't bump this, your change won't take
  * effect on any machine that already has a current database.
  */
-export const IMPORT_VERSION = 7;
+export const IMPORT_VERSION = 8;
 
 /** Where the sidecar lives, given the JSONL path it describes. */
 export function sidecarPathFor(jsonlPath: string): string {

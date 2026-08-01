@@ -9,6 +9,8 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-08-01
+
 ### Fixed
 
 - **Cards written down the way people actually write them now match.** A card
@@ -23,6 +25,34 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   "You're Gonna Need a Bigger Boat" is Abrade. These alternate names live on
   the printing rather than the card, so the bulk data has none of them; 602 of
   them, covering 428 cards, are now indexed.
+- **Card relationships were being built on a broken vocabulary, and 37% of
+  them were wrong.** Three separate causes, all found by checking real lists
+  against the new deck summary rather than by reading code:
+  - Non-creature subtypes were read as creature types. "Battle — Control
+    Point" made *Control* a creature type, so every card saying "creatures you
+    control" registered as caring about Control Kindred — a 30-card
+    aristocrats list came back with a 14-card "Control Kindred" theme.
+  - A creature card's subtypes still are not all creature types, and are not
+    positionally separable: "Artifact Creature — Equipment Boar" and "Kindred
+    Enchantment — Lhurgoyf Aura" each carry one of each. That made Equipment,
+    Aura, and Saga creature types. The vocabulary now comes from Scryfall's
+    creature-type catalog rather than being inferred.
+  - Joke-set type lines ("Creature — Lady of Proper Etiquette") made *of* a
+    creature type. The vocabulary now describes the legal format only.
+
+  Precomputed relationships went from 134,293 to 84,471. This was inflating
+  commander scores as well as the new summary.
+- **Every Equipment was counting as its own Voltron payoff**, because
+  "Equipped creature gets +2/+2" is an Equipment describing its own effect. A
+  20-card Equipment pile read as a complete Voltron deck while lacking any
+  reason to be stacking Equipment at all. A payoff is now a card that rewards
+  you for suiting up and is not itself the suit — Sram, Kor Spiritdancer,
+  Sigarda's Aid, Kemba.
+- **Having a keyword is no longer a theme.** A graveyard deck with four fliers
+  in it was reporting a five-card "Flying" theme. A keyword only counts when
+  something in the list grants it or triggers off it, the same "cares, not
+  shares" rule the commander scoring already used. Kindred is deliberately
+  exempt: being a Goblin is a plan in a way that having flying is not.
 
 ### Changed
 
@@ -76,6 +106,25 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
 - **Type a page number** to jump straight to it, alongside the numbered
   buttons. Only shown once there are enough pages that the numbers start
   collapsing behind an ellipsis.
+- **"What this list is doing"** — a summary of the strongest patterns in your
+  cards, above the commander suggestions and independent of them. Each theme
+  is shown as a chain rather than a count: Aristocrats needs fodder, a
+  sacrifice outlet, and a death payoff, and a list with nine death triggers
+  and one outlet is told exactly that. Themes with no chain to break — Goblin
+  Kindred is a membership group, not an engine — are reported as a depth
+  count instead, with no invented shortfall.
+- **Cards that would fill the gap.** Where a chain is broken, up to fifteen
+  cards that would fix it, five at a time. They are restricted to colors your
+  list already plays, exclude cards you already have, and are ranked first by
+  how many of your *other* themes the card also feeds — the one ranking input
+  that comes from your actual list. Slots are filled across archetype
+  boundaries where that is how the game works: Reanimator's graveyard-filling
+  is answered by Self-Mill cards, because nothing in Reanimator itself fills
+  a graveyard.
+- A **★ "often the missing piece"** marker on the slot each archetype tends to
+  lack. Explicitly labelled as low confidence — it is a judgement call, not a
+  measurement, and it says so on hover. It will be revisited once there are
+  enough real lists to check it against.
 
 ## [1.6.0] — 2026-07-30
 
