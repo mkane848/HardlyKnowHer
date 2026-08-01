@@ -210,6 +210,40 @@ function findProducedTokenTypes(text: string, vocab: Vocabulary): string[] {
 }
 
 /**
+ * The creature types on a card, from its type line.
+ *
+ * Two filters, because either one alone lets junk through:
+ *
+ *   1. **Only Creature and Kindred cards have creature types** (CR 205.3m).
+ *      Every other card type has its own subtype list. "Battle — Control
+ *      Point" made *Control* a creature type, so every card reading "creatures
+ *      you control" was detected as caring about Control Kindred, and a real
+ *      30-card list came back with a 14-card "Control Kindred" theme.
+ *
+ *   2. **The subtypes of a Creature card are still not all creature types.**
+ *      They are mixed together and not positionally separable: "Artifact
+ *      Creature — Equipment Boar" and "Kindred Enchantment — Lhurgoyf Aura"
+ *      each carry one of each. That made Equipment, Aura, and Saga creature
+ *      types, and produced a three-card "Aura Kindred" theme on a graveyard
+ *      list.
+ *
+ * `knownTypes` is Scryfall's creature-type catalog, fetched alongside the bulk
+ * data. Omitting it falls back to filter 1 only, which is what a database
+ * seeded before the catalog existed gets — narrower than nothing, and it
+ * degrades rather than failing.
+ */
+export function parseCreatureTypes(typeLine: string, knownTypes?: Set<string>): string[] {
+  const [typePart, subtypePart] = typeLine.split('—');
+  if (!subtypePart) return [];
+  // Word-boundary matched, and checked against the type part only: a Battle
+  // whose subtype happened to read "Creature" would otherwise slip through.
+  if (!/\b(Creature|Kindred|Tribal)\b/.test(typePart)) return [];
+
+  const words = subtypePart.trim().split(/\s+/).filter(Boolean);
+  return knownTypes ? words.filter((word) => knownTypes.has(word)) : words;
+}
+
+/**
  * Lookup tables for the vocabulary signal detection recognises.
  *
  * Built once and reused across every card. The point is direction: with a
@@ -774,4 +808,45 @@ export function supports(signal: SignalMatch, supporter: SignalMatch[], facts: C
     return facts.keywords.includes(signal.qualifier);
   }
   return sameArchetype.some((s) => s.qualifier === signal.qualifier);
+}
+
+/**
+ * Presentation details for a signal read back out of storage.
+ *
+ * The `card_signals` table records what a card *is* — archetype, qualifier,
+ * roles — and deliberately not how to label it. Labels and weights are
+ * presentation, and storing them would mean a reworded description needed a
+ * full re-import to take effect. This rebuilds them from the catalog instead.
+ */
+export function archetypeDisplay(
+  archetype: string,
+  qualifier: string | null
+): { label: string; description: string; weight: number } {
+  if (archetype === 'kindred' && qualifier) {
+    return {
+      label: `${qualifier} Kindred`,
+      description: `${pluralOfType(qualifier)}, and cards that care about having them.`,
+      weight: 15,
+    };
+  }
+  if (archetype === 'keywordCare' && qualifier) {
+    return {
+      label: qualifier,
+      description: `Cards with ${qualifier}, where the commander actually cares about it.`,
+      weight: 8,
+    };
+  }
+
+  const def = ARCHETYPES.find((a) => a.key === archetype);
+  if (!def) {
+    // An archetype in the database that the catalog no longer defines — the
+    // shape of things after a rename without a re-import. Degrade to the raw
+    // key rather than crashing; the next import drops the row.
+    return { label: archetype, description: '', weight: 10 };
+  }
+  return {
+    label: qualifier ? `${def.label} (${qualifier})` : def.label,
+    description: def.description,
+    weight: def.weight,
+  };
 }

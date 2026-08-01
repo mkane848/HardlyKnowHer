@@ -3,7 +3,12 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { frontFaceCharacteristics, isCommanderEligible } from '../src/services/eligibility';
 import { faceNameEntries } from '../src/services/cardNames';
-import { buildCardFacts, buildVocabulary, detectSignals } from '../src/services/signals';
+import {
+  buildCardFacts,
+  buildVocabulary,
+  detectSignals,
+  parseCreatureTypes,
+} from '../src/services/signals';
 import type { CardRow } from '../src/types';
 import { IMPORT_VERSION, readSidecar } from '../src/services/dataSnapshot';
 import { readImportedSnapshot, writeImportedSnapshot } from '../src/services/importedSnapshot';
@@ -11,6 +16,15 @@ import { readImportedSnapshot, writeImportedSnapshot } from '../src/services/imp
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
 const DEFAULT_INPUT = path.join(DATA_DIR, 'oracle-cards.jsonl');
+
+// Scryfall's creature-type catalog, from the companion file fetch-scryfall.ts
+// writes. Absent when the fetch predates it — parseCreatureTypes then falls
+// back to type-line structure alone, which is looser but not wrong. See its
+// doc comment for why the catalog is needed at all.
+const CREATURE_TYPES_PATH = path.join(DATA_DIR, 'creature-types.json');
+const knownCreatureTypes = fs.existsSync(CREATURE_TYPES_PATH)
+  ? new Set(JSON.parse(fs.readFileSync(CREATURE_TYPES_PATH, 'utf-8')) as string[])
+  : undefined;
 
 // Flags are filtered out before looking for the optional input path —
 // otherwise `import-scryfall --force` reads "--force" as the filename and
@@ -196,12 +210,6 @@ db.exec(`
   CREATE INDEX idx_card_signals_archetype ON card_signals(archetype, qualifier);
 `);
 
-function parseCreatureTypes(typeLine: string): string[] {
-  const afterDash = typeLine.split('—')[1];
-  if (!afterDash) return [];
-  return afterDash.trim().split(/\s+/).filter(Boolean);
-}
-
 interface PartnerInfo {
   ability: string | null;
   target: string | null;
@@ -326,7 +334,7 @@ const insertMany = db.transaction((rows: any[]) => {
       // Front face too: a card in your library or hand is its front face, so
       // Delver of Secrets counts toward Wizards, not toward the Insect its
       // battlefield-only back side becomes.
-      creature_types: JSON.stringify(parseCreatureTypes(front.typeLine)),
+      creature_types: JSON.stringify(parseCreatureTypes(front.typeLine, knownCreatureTypes)),
       // Kept so the card-detail dialog can show what a printed card shows,
       // and link out to the real page rather than reimplementing it.
       power: card.power ?? card.card_faces?.[0]?.power ?? null,
@@ -378,6 +386,12 @@ console.log(`${faceNames.c} face names indexed for single-side matching.`);
   const creatureTypes = new Set<string>();
   const keywords = new Set<string>();
   for (const row of cardRows) {
+    // Legal cards only. The joke sets carry type lines the real game does not
+    // — "Creature — Lady of Proper Etiquette" made *of* a creature type, and
+    // every card with "of" in its text then read as caring about it. Signals
+    // are still detected for every card; it is the vocabulary those signals
+    // are matched against that has to describe the playable format.
+    if (row.legality_commander !== 'legal') continue;
     for (const type of JSON.parse(row.creature_types || '[]') as string[]) creatureTypes.add(type);
     for (const keyword of JSON.parse(row.keywords || '[]') as string[]) keywords.add(keyword);
   }

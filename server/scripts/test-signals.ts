@@ -17,6 +17,7 @@ import {
   buildVocabulary,
   detectSignals,
   hasActiveRole,
+  parseCreatureTypes,
   stripSelfReferences,
   type Role,
   type SignalMatch,
@@ -396,6 +397,50 @@ check('an Equipment is a Voltron card by type', () => {
   const roles = rolesOf(signalsFor(sword), 'voltron');
   assert.ok(roles.includes('is'));
   assert.ok(roles.includes('rewards'));
+});
+
+// --- creature types: the vocabulary the rest of this depends on ------------
+
+const CREATURE_TYPES = new Set(['Boar', 'Lhurgoyf', 'Knight', 'Goblin', 'Elf', 'Wall']);
+
+check('a card with no subtypes has no creature types', () => {
+  assert.deepStrictEqual(parseCreatureTypes('Instant'), []);
+});
+
+check('a non-creature card contributes no creature types', () => {
+  // "Battle — Control Point" is the one that broke it: every card reading
+  // "creatures you control" was detected as caring about Control Kindred.
+  assert.deepStrictEqual(parseCreatureTypes('Battle — Control Point', CREATURE_TYPES), []);
+  assert.deepStrictEqual(parseCreatureTypes('Land — Cave', CREATURE_TYPES), []);
+  assert.deepStrictEqual(parseCreatureTypes('Artifact — Equipment', CREATURE_TYPES), []);
+  assert.deepStrictEqual(parseCreatureTypes('Enchantment — Aura', CREATURE_TYPES), []);
+});
+
+check("a creature card's non-creature subtypes are dropped", () => {
+  // The subtypes of one card are mixed and not positionally separable, so
+  // the catalog is what settles it.
+  assert.deepStrictEqual(
+    parseCreatureTypes('Artifact Creature — Equipment Boar', CREATURE_TYPES),
+    ['Boar']
+  );
+  assert.deepStrictEqual(
+    parseCreatureTypes('Enchantment Creature — Saga Knight', CREATURE_TYPES),
+    ['Knight']
+  );
+});
+
+check('Kindred cards carry creature types even without being creatures', () => {
+  assert.deepStrictEqual(
+    parseCreatureTypes('Kindred Enchantment — Lhurgoyf Aura', CREATURE_TYPES),
+    ['Lhurgoyf']
+  );
+});
+
+check('without a catalog it falls back to type-line structure alone', () => {
+  // A database seeded before the catalog file existed still gets the
+  // Creature/Kindred gate rather than nothing.
+  assert.deepStrictEqual(parseCreatureTypes('Battle — Control Point'), []);
+  assert.deepStrictEqual(parseCreatureTypes('Creature — Goblin Wizard'), ['Goblin', 'Wizard']);
 });
 
 if (failures > 0) {

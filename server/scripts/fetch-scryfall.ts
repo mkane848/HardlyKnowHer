@@ -12,6 +12,7 @@ const OUTPUT_PATH = path.join(DATA_DIR, 'oracle-cards.jsonl');
 // Small companion file — see fetchFlavorNames below for why this isn't part
 // of the bulk download.
 const FLAVOR_NAMES_PATH = path.join(DATA_DIR, 'flavor-names.json');
+const CREATURE_TYPES_PATH = path.join(DATA_DIR, 'creature-types.json');
 
 /**
  * Reuse is decided by comparing the *published snapshot* against the one on
@@ -123,6 +124,7 @@ async function main() {
     // bulk download must not mean permanently skipping a companion file that
     // didn't exist when that copy was downloaded.
     if (!fs.existsSync(FLAVOR_NAMES_PATH)) await fetchFlavorNames();
+    if (!fs.existsSync(CREATURE_TYPES_PATH)) await fetchCreatureTypes();
     return;
   }
 
@@ -164,6 +166,43 @@ async function main() {
   });
 
   await fetchFlavorNames();
+  await fetchCreatureTypes();
+}
+
+/**
+ * Every creature type in the game, from Scryfall's own catalog.
+ *
+ * A type line's subtypes are not all creature types, and they are not
+ * positionally separable: "Artifact Creature — Equipment Boar" carries an
+ * artifact subtype and a creature type in that order, and "Kindred Enchantment
+ * — Lhurgoyf Aura" does the same with an enchantment subtype. Deriving the
+ * vocabulary from type lines therefore made Equipment, Aura, and Saga
+ * "creature types", and a graveyard list came back with a three-card "Aura
+ * Kindred" theme.
+ *
+ * One 30KB request against an endpoint we already use, and it stays correct
+ * as new types are printed — which a hand-maintained denylist would not.
+ */
+async function fetchCreatureTypes() {
+  console.log('Fetching the creature-type catalog...');
+
+  const res = await fetch('https://api.scryfall.com/catalog/creature-types', {
+    headers: SCRYFALL_HEADERS,
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch the creature-type catalog (${await describeFailure(res)})`);
+  }
+
+  const body = (await res.json()) as { data?: unknown };
+  if (!Array.isArray(body.data) || body.data.length === 0) {
+    throw new Error(
+      'The creature-type catalog came back without a non-empty `data` array. Check ' +
+        'https://scryfall.com/docs/api/catalogs for the current shape.'
+    );
+  }
+
+  fs.writeFileSync(CREATURE_TYPES_PATH, JSON.stringify(body.data, null, 2));
+  console.log(`Saved ${body.data.length} creature types to ${CREATURE_TYPES_PATH}.`);
 }
 
 /**
