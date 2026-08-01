@@ -2,7 +2,13 @@ import path from 'node:path';
 import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import type { CardRow } from './types';
-import { archetypeDisplay, type SignalMatch } from './services/signals';
+import {
+  archetypeDisplay,
+  signalKey,
+  type SignalCandidate,
+  type SignalKey,
+  type SignalMatch,
+} from './services/signals';
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'cards.sqlite');
@@ -31,7 +37,14 @@ function columnExists(table: string, column: string): boolean {
 // confusing SQL error when the database is still empty.
 export const isSeeded = tableExists('cards');
 
-const exactNameStmt = db.prepare('SELECT * FROM cards WHERE name_lower = ? LIMIT 1');
+// Guarded like the tables below, and for a sharper reason: `cards` is the
+// table isSeeded checks for, so preparing against it unconditionally made an
+// unseeded database throw "no such table: cards" while this module was still
+// loading — before any route could read isSeeded and answer with the helpful
+// "run npm run import-scryfall" message it exists to give.
+const exactNameStmt = isSeeded
+  ? db.prepare('SELECT * FROM cards WHERE name_lower = ? LIMIT 1')
+  : null;
 
 // card_face_names is a newer table than `cards`; a database seeded before it
 // existed would still pass isSeeded. Guard its existence rather than let a
@@ -83,7 +96,7 @@ export function findCardsByNames(names: string[]): Map<string, CardRow> {
   const map = new Map<string, CardRow>();
   for (const name of names) {
     const lower = name.toLowerCase();
-    const row = (exactNameStmt.get(lower) ??
+    const row = (exactNameStmt?.get(lower) ??
       faceNameStmt?.get(lower) ??
       flavorNameStmt?.get(lower)) as CardRow | undefined;
     if (row) map.set(lower, row);
@@ -169,22 +182,6 @@ export function findSignalsByOracleIds(oracleIds: string[]): Map<string, SignalM
   return map;
 }
 
-/** One card that participates in a requested archetype, and how. */
-export interface SignalCandidate {
-  row: CardRow;
-  roles: SignalMatch['roles'];
-}
-
-/** Identifies one archetype, including its qualifier where it has one. */
-export interface SignalKey {
-  archetype: string;
-  qualifier?: string;
-}
-
-export function signalKeyOf({ archetype, qualifier }: SignalKey): string {
-  return qualifier ? `${archetype}:${qualifier}` : archetype;
-}
-
 /**
  * Every legal card participating in each of these archetypes.
  *
@@ -199,7 +196,7 @@ export function findCardsBySignals(keys: SignalKey[]): Map<string, SignalCandida
   if (!hasSignalsTable) return map;
 
   for (const key of keys) {
-    const cacheKey = signalKeyOf(key);
+    const cacheKey = signalKey(key);
     if (map.has(cacheKey)) continue;
 
     // IS NOT DISTINCT FROM would be tidier, but SQLite's `IS` already treats

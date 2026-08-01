@@ -16,8 +16,7 @@ import type { CardRow } from '../types';
 import type { Role } from './signals';
 import type { DeckAnalysis, SlotSuggestion } from './deckAnalysis';
 import { crossArchetypeSlot, lifecycleFor } from './lifecycle';
-import type { SignalCandidate, SignalKey } from '../db';
-import { signalKeyOf } from '../db';
+import { signalKey, type SignalCandidate, type SignalKey } from './signals';
 
 /**
  * How many suggestions to compute per short slot.
@@ -60,7 +59,7 @@ function fitsColors(row: CardRow, allowed: Set<string>): boolean {
 }
 
 export interface SuggestionContext {
-  /** Candidates by `signalKeyOf`, from `findCardsBySignals`. */
+  /** Candidates by `signalKey`, from `findCardsBySignals`. */
   candidatesByKey: Map<string, SignalCandidate[]>;
   /** Cards already in the list, which must never be suggested back. */
   ownedOracleIds: Set<string>;
@@ -78,7 +77,7 @@ export interface SuggestionContext {
  */
 export function requiredSignalKeys(analysis: DeckAnalysis): SignalKey[] {
   const keys = new Map<string, SignalKey>();
-  const add = (key: SignalKey) => keys.set(signalKeyOf(key), key);
+  const add = (key: SignalKey) => keys.set(signalKey(key), key);
 
   for (const theme of analysis.themes) {
     add({ archetype: theme.archetype, qualifier: theme.qualifier });
@@ -151,7 +150,7 @@ export function attachSuggestions(
   // answered without a second lookup per candidate.
   const themeLabelsByCard = new Map<string, string[]>();
   for (const theme of analysis.themes) {
-    const candidates = candidatesByKey.get(signalKeyOf({ archetype: theme.archetype, qualifier: theme.qualifier }));
+    const candidates = candidatesByKey.get(signalKey({ archetype: theme.archetype, qualifier: theme.qualifier }));
     for (const candidate of candidates ?? []) {
       const labels = themeLabelsByCard.get(candidate.row.oracle_id);
       if (labels) labels.push(theme.label);
@@ -173,8 +172,8 @@ export function attachSuggestions(
 
       const cross = crossArchetypeSlot(theme.archetype, slot.key);
       const sourceKey = cross
-        ? signalKeyOf({ archetype: cross.archetype })
-        : signalKeyOf({ archetype: theme.archetype, qualifier: theme.qualifier });
+        ? signalKey({ archetype: cross.archetype })
+        : signalKey({ archetype: theme.archetype, qualifier: theme.qualifier });
       const wantedRoles: Role[] = cross ? cross.roles : wanted.roles;
 
       const roleCount = new Map<string, number>();

@@ -48,6 +48,12 @@ MINOR is a new capability, and PATCH is a fix with no new capability.
   reason to be stacking Equipment at all. A payoff is now a card that rewards
   you for suiting up and is not itself the suit — Sram, Kor Spiritdancer,
   Sigarda's Aid, Kemba.
+- **The server no longer crashes on a database that has never been imported.**
+  The statement resolving card names was prepared while the module was still
+  loading, against the very table `isSeeded` exists to check for — so an
+  unseeded database threw `no such table: cards` at startup instead of letting
+  the routes answer with the "run npm run import-scryfall" message written for
+  exactly that case.
 - **Having a keyword is no longer a theme.** A graveyard deck with four fliers
   in it was reporting a five-card "Flying" theme. A keyword only counts when
   something in the list grants it or triggers off it, the same "cares, not

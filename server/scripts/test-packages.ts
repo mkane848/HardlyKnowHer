@@ -8,9 +8,8 @@
  */
 import assert from 'node:assert';
 import type { CardRow } from '../src/types';
-import type { Role, SignalMatch } from '../src/services/signals';
-import type { SignalCandidate } from '../src/db';
-import { signalKeyOf } from '../src/db';
+import { signalKey, type Role, type SignalCandidate, type SignalMatch } from '../src/services/signals';
+
 import { analyzeDeck, type DeckAnalysis } from '../src/services/deckAnalysis';
 import {
   attachSuggestions,
@@ -124,7 +123,7 @@ check('cross-archetype slots pull their source archetype into the query set', ()
   // list may hold none of — so selfMill has to be fetched even though it is
   // not one of the list's themes.
   const { owned, signals } = owning(themed('reanimator', 4, ['rewards'], 'r'));
-  const keys = requiredSignalKeys(analyzeDeck(owned, signals)).map(signalKeyOf);
+  const keys = requiredSignalKeys(analyzeDeck(owned, signals)).map(signalKey);
   assert.ok(keys.includes('reanimator'));
   assert.ok(keys.includes('selfMill'));
 });
@@ -137,7 +136,7 @@ check('qualified themes are queried with their qualifier, not bare', () => {
     owned.push({ row, quantity: 1 });
     signals.set(row.oracle_id, [signal('kindred', ['is'], 'Goblin')]);
   }
-  const keys = requiredSignalKeys(analyzeDeck(owned, signals)).map(signalKeyOf);
+  const keys = requiredSignalKeys(analyzeDeck(owned, signals)).map(signalKey);
   assert.deepStrictEqual(keys, ['kindred:Goblin']);
 });
 

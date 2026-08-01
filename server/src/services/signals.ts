@@ -110,10 +110,28 @@ export interface SignalMatch {
   roles: Role[];
 }
 
+/**
+ * Identifies one archetype, including its qualifier where it has one.
+ *
+ * The minimal shape a `SignalMatch` satisfies structurally, so callers that
+ * only want to *name* an archetype — "fetch me everything tagged
+ * kindred:Goblin" — don't have to invent a whole match to do it.
+ */
+export interface SignalKey {
+  archetype: string;
+  qualifier?: string;
+}
+
 /** A signal's stable identity, so the same archetype at different qualifiers
  * counts as different signals. */
-export function signalKey(match: SignalMatch): string {
-  return match.qualifier ? `${match.archetype}:${match.qualifier}` : match.archetype;
+export function signalKey({ archetype, qualifier }: SignalKey): string {
+  return qualifier ? `${archetype}:${qualifier}` : archetype;
+}
+
+/** One card that participates in a requested archetype, and how. */
+export interface SignalCandidate {
+  row: CardRow;
+  roles: Role[];
 }
 
 // ---------------------------------------------------------------------------
