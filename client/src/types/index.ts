@@ -37,6 +37,32 @@ export interface KeywordSupportDTO {
   cards: SupportingCardDTO[];
 }
 
+/**
+ * The wire shape of the above, before rehydration.
+ *
+ * A cited card is one of *your* cards, so the same handful repeats under
+ * every commander — 26,618 citations of 28 cards on one measured list. The
+ * server sends them once in `cardIndex` and cites positions; `client.ts`
+ * swaps the positions back for objects on receipt, so nothing below the API
+ * layer ever sees this shape.
+ */
+type Cited<T extends { cards: SupportingCardDTO[] }> = Omit<T, 'cards'> & { cards: number[] };
+
+export type WireCommanderSuggestionDTO = Omit<
+  CommanderSuggestionDTO,
+  'themeSupport' | 'kindredSupport' | 'keywordSupport' | 'gameChangerCards'
+> & {
+  themeSupport: Cited<ThemeSupportDTO>[];
+  kindredSupport: Cited<KindredSupportDTO>[];
+  keywordSupport: Cited<KeywordSupportDTO>[];
+  gameChangerCards: number[];
+};
+
+export type WireRecommendResponse = Omit<RecommendResponse, 'suggestions'> & {
+  cardIndex: SupportingCardDTO[];
+  suggestions: WireCommanderSuggestionDTO[];
+};
+
 /** One card of a commander unit — a solo commander has one, a Partner/Background pair has two. */
 export interface CommanderCardDTO {
   oracleId: string;
